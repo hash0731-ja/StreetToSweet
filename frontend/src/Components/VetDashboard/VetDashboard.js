@@ -1,0 +1,978 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import {
+  PawPrint,
+  LogOut,
+  Clock,
+  Activity,
+  FileText,
+  Search,
+  Filter,
+  Stethoscope,
+  Syringe,
+  CheckCircle,
+  AlertCircle,
+  Plus,
+  X,
+  Calendar,
+  UserCheck,
+  Heart,
+  Users,
+  Eye,
+  Check,
+  XCircle
+} from "lucide-react";
+import "./VetDashboard.css";
+
+const VetDashboard = () => {
+  const navigate = useNavigate();
+  const [vet, setVet] = useState({});
+  const [dogs, setDogs] = useState([]);
+  const [adoptionRequests, setAdoptionRequests] = useState([]);
+  const [selectedDog, setSelectedDog] = useState(null);
+  const [selectedAdoption, setSelectedAdoption] = useState(null);
+  const [activeTab, setActiveTab] = useState("treatment");
+  const [showTreatmentForm, setShowTreatmentForm] = useState(false);
+  const [showVaccinationForm, setShowVaccinationForm] = useState(false);
+  const [showCertificationForm, setShowCertificationForm] = useState(false);
+  const [showAdoptionDetails, setShowAdoptionDetails] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000";
+const [loading, setLoading] = useState(true);
+  const [treatmentForm, setTreatmentForm] = useState({
+    diagnosis: "",
+    treatment: "",
+    medication: "",
+    dosage: "",
+    notes: ""
+  });
+
+  const [vaccinationForm, setVaccinationForm] = useState({
+    vaccineType: "",
+    batchNumber: "",
+    nextDueDate: "",
+    notes: ""
+  });
+
+  const [certificationForm, setCertificationForm] = useState({
+    healthStatus: "Healthy",
+    approvalForAdoption: false,
+    notes: ""
+  });
+
+  // Helper to attach auth header
+  const authHeader = () => {
+    const token = localStorage.getItem("authToken") || localStorage.getItem("token");
+    return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  };
+
+  // Format date function
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get vet dashboard data
+      const dash = await axios.get(`${API_BASE}/vet/dashboard`, authHeader());
+      const v = dash.data?.data?.vetInfo || {};
+      setVet({
+        name: v.name || "Veterinarian",
+        specialization: v.specialization || "Canine Health",
+        experience: v.experience || "",
+      });
+
+      // Get dogs list
+      const res = await axios.get(`${API_BASE}/vet/dogs`, authHeader());
+      const list = res.data?.data?.dogs || [];
+      setDogs(
+        list.map((d) => ({
+          _id: d._id,
+          name: d.name,
+          status: normalizeStatus(d.healthStatus),
+          photo: d.photo ? `${API_BASE}/uploads/dogs/${d.photo}` : "https://placehold.co/300x300?text=Dog",
+          breed: d.breed || "",
+          age: d.age || "",
+          lastCheckup: d.updatedAt,
+          nextCheckup: d.nextCheckup,
+          healthCertified: d.healthCertified || false,
+          vaccinations: d.vaccinations || [],
+          medicalHistory: d.medicalHistory || [],
+        }))
+      );
+
+      // Fetch adoption requests pending vet approval
+      const adoptionRes = await axios.get(`${API_BASE}/vet/adoption-requests/pending`, authHeader());
+      
+      // Handle the response structure from your backend
+      const adoptionData = adoptionRes.data?.data?.requests || adoptionRes.data || [];
+      
+      // Enhance adoption data with dog information
+      const enhancedAdoptions = adoptionData.map(adoption => {
+        // If dog info is not populated, use the stored dog details
+        const dogInfo = adoption.dog || {
+          _id: adoption.dogId,
+          name: adoption.dogName,
+          breed: adoption.dogBreed,
+          photo: adoption.dogPhoto
+        };
+        
+        return {
+          _id: adoption._id || adoption.id,
+          dog: {
+            _id: dogInfo._id,
+            name: dogInfo.name || "Unknown Dog",
+            breed: dogInfo.breed || "Unknown Breed",
+            age: dogInfo.age || "Unknown Age",
+            photo: dogInfo.photo ? `${API_BASE}/uploads/dogs/${dogInfo.photo}` : "https://placehold.co/300x300?text=Dog",
+            healthStatus: dogInfo.healthStatus || "unknown"
+          },
+          user: adoption.applicantUser || {
+            _id: adoption.userId,
+            name: adoption.fullName || "Unknown User",
+            email: adoption.email || "No email provided",
+            phone: adoption.phone || "No phone provided",
+            address: adoption.address || "No address provided"
+          },
+          status: adoption.requestStatus || "pending",
+          createdAt: adoption.createdAt || new Date().toISOString(),
+          notes: adoption.message || "",
+          vetApproved: adoption.vetReviewStatus === "approved"
+        };
+      });
+
+      setAdoptionRequests(enhancedAdoptions);
+      
+    } catch (e) {
+      console.error("Vet dashboard fetch failed:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchData();
+}, []);
+
+  const normalizeStatus = (healthStatus) => {
+    switch (healthStatus) {
+      case "healthy":
+      case "excellent":
+        return "Healthy";
+      case "monitoring":
+        return "Recovering";
+      case "needs_care":
+      case "critical":
+        return "Needs Attention";
+      default:
+        return "Needs Attention";
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("vetId");
+    navigate("/");
+  };
+
+  // Existing vet functions
+  const handleAddTreatment = async () => {
+    if (!(treatmentForm.diagnosis && treatmentForm.treatment) || !selectedDog) return;
+    try {
+      await axios.post(
+        `${API_BASE}/vet/dogs/${selectedDog._id}/treatments`,
+        { ...treatmentForm },
+        authHeader()
+      );
+      // Refresh dogs minimal fields locally
+      setDogs((prev) =>
+        prev.map((d) =>
+          d._id === selectedDog._id
+            ? {
+                ...d,
+                lastCheckup: new Date().toISOString(),
+                status: treatmentForm.diagnosis.toLowerCase().includes("routine")
+                  ? "Healthy"
+                  : treatmentForm.diagnosis.toLowerCase().includes("infection")
+                  ? "Recovering"
+                  : "Needs Attention",
+                medicalHistory: [
+                  {
+                    _id: Math.random().toString(36).substr(2, 9),
+                    date: new Date().toISOString().split("T")[0],
+                    type: "Treatment",
+                    ...treatmentForm,
+                  },
+                  ...d.medicalHistory,
+                ],
+              }
+            : d
+        )
+      );
+      setShowTreatmentForm(false);
+      setTreatmentForm({ diagnosis: "", treatment: "", medication: "", dosage: "", notes: "" });
+      alert("Treatment recorded successfully!");
+    } catch (e) {
+      console.error("Save treatment failed", e);
+      alert("Failed to save treatment");
+    }
+  };
+
+  const handleAddVaccination = async () => {
+    if (!(vaccinationForm.vaccineType && vaccinationForm.batchNumber) || !selectedDog) return;
+    try {
+      await axios.post(
+        `${API_BASE}/vet/dogs/${selectedDog._id}/vaccinations`,
+        {
+          vaccineType: vaccinationForm.vaccineType,
+          batchNumber: vaccinationForm.batchNumber,
+          nextDueDate: vaccinationForm.nextDueDate,
+          notes: vaccinationForm.notes,
+        },
+        authHeader()
+      );
+      setDogs((prev) =>
+        prev.map((d) =>
+          d._id === selectedDog._id
+            ? {
+                ...d,
+                lastCheckup: new Date().toISOString(),
+                vaccinations: [
+                  {
+                    _id: Math.random().toString(36).substr(2, 9),
+                    date: new Date().toISOString().split("T")[0],
+                    vaccineType: vaccinationForm.vaccineType,
+                    batchNumber: vaccinationForm.batchNumber,
+                    nextDueDate: vaccinationForm.nextDueDate,
+                  },
+                  ...d.vaccinations,
+                ],
+              }
+            : d
+        )
+      );
+      setShowVaccinationForm(false);
+      setVaccinationForm({ vaccineType: "", batchNumber: "", nextDueDate: "", notes: "" });
+      alert("Vaccination recorded successfully!");
+    } catch (e) {
+      console.error("Save vaccination failed", e);
+      alert("Failed to save vaccination");
+    }
+  };
+
+  const handleCertifyHealth = async () => {
+    if (!certificationForm.healthStatus || !selectedDog) return;
+    try {
+      await axios.post(
+        `${API_BASE}/vet/dogs/${selectedDog._id}/certify`,
+        {
+          healthStatus: certificationForm.healthStatus,
+          approvalForAdoption: certificationForm.approvalForAdoption,
+          notes: certificationForm.notes,
+        },
+        authHeader()
+      );
+
+      // Reflect in UI
+      setDogs((prev) =>
+        prev.map((d) =>
+          d._id === selectedDog._id
+            ? {
+                ...d,
+                status: certificationForm.healthStatus,
+                healthCertified: certificationForm.approvalForAdoption,
+                certifiedDate: new Date().toISOString().split("T")[0],
+                certifiedBy: vet.name,
+              }
+            : d
+        )
+      );
+      setShowCertificationForm(false);
+      setCertificationForm({ healthStatus: "Healthy", approvalForAdoption: false, notes: "" });
+      alert("Health certification updated successfully!");
+    } catch (e) {
+      console.error("Certify health failed", e);
+      alert("Failed to certify health");
+    }
+  };
+
+  // Add this function in VetDashboard.js
+const handleCertifyForAdoption = async (dogId, adoptionId, isApproved) => {
+  try {
+    // Update dog health certification status
+    await axios.post(
+      `${API_BASE}/vet/dogs/${dogId}/certify`,
+      {
+        healthStatus: isApproved ? "Healthy" : "Not Fit",
+        approvalForAdoption: isApproved,
+        notes: isApproved ? "Cleared for adoption" : "Not fit for adoption"
+      },
+      authHeader()
+    );
+
+    // Update adoption request status
+    await axios.post(
+      `${API_BASE}/vet/adoption-requests/${adoptionId}/${isApproved ? "approve" : "reject"}`,
+      {},
+      authHeader()
+    );
+
+    // Update local state
+    setDogs(prev => 
+      prev.map(d => 
+        d._id === dogId 
+          ? { 
+              ...d, 
+              status: isApproved ? "Healthy" : "Needs Attention",
+              healthCertified: isApproved 
+            } 
+          : d
+      )
+    );
+
+    setAdoptionRequests(prev => 
+      prev.map(req => 
+        req._id === adoptionId 
+          ? { 
+              ...req, 
+              status: isApproved ? "vet_approved" : "vet_rejected",
+              vetApproved: isApproved 
+            } 
+          : req
+      )
+    );
+
+    alert(`Adoption ${isApproved ? "approved" : "rejected"} successfully!`);
+  } catch (e) {
+    console.error("Certification failed", e);
+    alert("Failed to update certification status");
+  }
+};
+
+  const handleDownloadReport = async (dog) => {
+    try {
+      const token = (localStorage.getItem('authToken') || localStorage.getItem('token')) || '';
+      const res = await fetch(`${API_BASE}/vet/dogs/${dog._id}/report`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        method: 'GET',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      // Try get filename from headers
+      const dispo = res.headers.get('Content-Disposition');
+      let filename = `${dog.name || 'Dog'}_Medical_Report.pdf`;
+      if (dispo) {
+        const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(dispo);
+        const fromHeader = decodeURIComponent(match?.[1] || match?.[2] || '');
+        if (fromHeader) filename = fromHeader;
+      }
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Download report failed', e);
+    }
+  };
+
+  // New functions for adoption approval
+  const handleViewAdoptionDetails = (adoption) => {
+    setSelectedAdoption(adoption);
+    setShowAdoptionDetails(true);
+  };
+
+  const handleApproveAdoption = async (adoptionId) => {
+    try {
+      await axios.post(
+        `${API_BASE}/vet/adoption-requests/${adoptionId}/approve`,
+        {},
+        authHeader()
+      );
+      
+      // Update the adoption request status
+      setAdoptionRequests(prev => 
+        prev.map(req => 
+          req._id === adoptionId 
+            ? { ...req, status: "vet_approved", vetApproved: true } 
+            : req
+        )
+      );
+      
+      alert("Adoption approved successfully!");
+    } catch (e) {
+      console.error("Adoption approval failed", e);
+      alert("Failed to approve adoption");
+    }
+  };
+
+  const handleRejectAdoption = async (adoptionId) => {
+    try {
+      await axios.post(
+        `${API_BASE}/vet/adoption-requests/${adoptionId}/reject`,
+        {},
+        authHeader()
+      );
+      
+      // Update the adoption request status
+      setAdoptionRequests(prev => 
+        prev.map(req => 
+          req._id === adoptionId 
+            ? { ...req, status: "vet_rejected", vetApproved: false } 
+            : req
+        )
+      );
+      
+      alert("Adoption rejected successfully!");
+    } catch (e) {
+      console.error("Adoption rejection failed", e);
+      alert("Failed to reject adoption");
+    }
+  };
+
+  // Filter for pending adoption requests - UPDATED to match your backend status
+const pendingAdoptions = adoptionRequests.filter(req => 
+  req.status === "pending" || req.status === "pending_vet_approval"
+);
+
+
+  return (
+    <div className="vet-dashboard">
+      {/* Header */}
+      <header className="vet-dashboard-header">
+        <div className="vet-header-left">
+          <div className="vet-logo">
+            <Stethoscope size={28} />
+            <h1>Veterinarian Dashboard</h1>
+          </div>
+        </div>
+        <div className="vet-header-right">
+          <div className="vet-user-info">
+            <div className="vet-user-greeting">
+              <span>Hello,</span>
+              <strong>{vet.name || "Veterinarian"}</strong>
+            </div>
+            <div className="vet-user-specialization">
+              <span>{vet.specialization || "Canine Health"}</span>
+            </div>
+          </div>
+          <button className="vet-logout-btn" onClick={handleLogout}>
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
+      </header>
+
+      {/* Navigation Tabs */}
+      <div className="vet-tabs">
+        <button 
+          className={`vet-tab ${activeTab === "treatment" ? "active" : ""}`}
+          onClick={() => setActiveTab("treatment")}
+        >
+          <Stethoscope size={18} />
+          Dog Treatment
+        </button>
+        <button 
+          className={`vet-tab ${activeTab === "adoptions" ? "active" : ""}`}
+          onClick={() => setActiveTab("adoptions")}
+        >
+          <Heart size={18} />
+          Adoption Approvals
+          {pendingAdoptions.length > 0 && (
+            <span className="vet-tab-badge">{pendingAdoptions.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* Dog Treatment Section (Existing Content) */}
+      {activeTab === "treatment" && (
+        <div className="vet-dashboard-content">
+          {/* Stats Overview */}
+          <div className="vet-stats-grid">
+            <div className="vet-stat-card">
+              <div className="vet-stat-icon total">
+                <PawPrint size={24} />
+              </div>
+              <div className="vet-stat-info">
+                <h3>{dogs.length}</h3>
+                <p>Total Dogs</p>
+              </div>
+            </div>
+            <div className="vet-stat-card">
+              <div className="vet-stat-icon attention">
+                <AlertCircle size={24} />
+              </div>
+              <div className="vet-stat-info">
+                <h3>{dogs.filter(dog => dog.status !== "Healthy").length}</h3>
+                <p>Need Attention</p>
+              </div>
+            </div>
+            <div className="vet-stat-card">
+              <div className="vet-stat-icon certified">
+                <CheckCircle size={24} />
+              </div>
+              <div className="vet-stat-info">
+                <h3>{dogs.filter(d => d.healthCertified).length}</h3>
+                <p>Health Certified</p>
+              </div>
+            </div>
+            <div className="vet-stat-card">
+              <div className="vet-stat-icon pending">
+                <UserCheck size={24} />
+              </div>
+              <div className="vet-stat-info">
+                <h3>{dogs.filter(d => !d.healthCertified).length}</h3>
+                <p>Pending Certification</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dogs List */}
+          <div className="vet-content-section">
+            <div className="vet-section-header">
+              <h3>
+                <PawPrint size={24} />
+                Dogs Under Care
+              </h3>
+              <div className="vet-search-filter">
+                <div className="vet-search-box">
+                  <Search size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search dogs..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">All Status</option>
+                  <option value="healthy">Healthy</option>
+                  <option value="needs attention">Needs Attention</option>
+                  <option value="recovering">Recovering</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="vet-dogs-grid">
+              {dogs.filter(dog => {
+                const matchesSearch = dog.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    dog.breed.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesStatus = statusFilter === "all" || dog.status.toLowerCase().includes(statusFilter.toLowerCase());
+                return matchesSearch && matchesStatus;
+              }).map((dog) => (
+                <div key={dog._id} className="vet-dog-card">
+                  <div className="vet-dog-image">
+                    <img src={dog.photo} alt={dog.name} />
+                    <div className={`vet-dog-status ${dog.status.toLowerCase().replace(" ", "-")}`}>
+                      {dog.status}
+                    </div>
+                    {dog.healthCertified && (
+                      <div className="vet-dog-certified">
+                        <CheckCircle size={16} />
+                        <span>Certified</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="vet-dog-info">
+                    <h4>{dog.name}</h4>
+                    <div className="vet-dog-details">
+                      <p><strong>Breed:</strong> {dog.breed}</p>
+                      <p><strong>Age:</strong> {dog.age}</p>
+                      <p><strong>Last Checkup:</strong> {formatDate(dog.lastCheckup)}</p>
+                      {dog.nextCheckup && (
+                        <p><strong>Next Checkup:</strong> {formatDate(dog.nextCheckup)}</p>
+                      )}
+                    </div>
+                    <div className="vet-dog-actions">
+                      <button 
+                        className="vet-btn primary"
+                        onClick={() => {
+                          setSelectedDog(dog);
+                          setShowTreatmentForm(true);
+                        }}
+                      >
+                        <Stethoscope size={16} />
+                        Log Treatment
+                      </button>
+                      <button 
+                        className="vet-btn secondary"
+                        onClick={() => {
+                          setSelectedDog(dog);
+                          setShowVaccinationForm(true);
+                        }}
+                      >
+                        <Syringe size={16} />
+                        Add Vaccination
+                      </button>
+                      <button 
+                        className="vet-btn secondary"
+                        onClick={() => {
+                          setSelectedDog(dog);
+                          setShowCertificationForm(true);
+                        }}
+                      >
+                        <UserCheck size={16} />
+                        Certify Health
+                      </button>
+                      <button
+                        className="vet-btn"
+                        onClick={() => handleDownloadReport(dog)}
+                        title="Download PDF Report"
+                      >
+                        <FileText size={16} />
+                        Download Report
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adoption Approvals Section (New Content) */}
+      {activeTab === "adoptions" && (
+        <div className="vet-dashboard-content">
+          <div className="vet-content-section">
+            <div className="vet-section-header">
+              <h3>
+                <Heart size={24} />
+                Pending Adoption Approvals
+              </h3>
+              <div className="vet-search-filter">
+                <div className="vet-search-box">
+                  <Search size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search adoptions..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {pendingAdoptions.length === 0 ? (
+              <div className="vet-empty-state">
+                <Heart size={48} />
+                <h4>No pending adoption approvals</h4>
+                <p>All adoption requests have been processed.</p>
+              </div>
+            ) : (
+              <div className="vet-adoptions-list">
+                {pendingAdoptions.map(adoption => (
+                  <div key={adoption._id} className="vet-adoption-card">
+                    <div className="vet-adoption-header">
+                      <div className="vet-adoption-dog">
+                        <img 
+                          src={adoption.dog?.photo ? `http://localhost:3000/uploads/dogs/${adoption.dog.photo}` : "https://placehold.co/300x300?text=Dog"} 
+                          alt={adoption.dog?.name} 
+                        />
+                        <div className="vet-adoption-dog-info">
+                          <h4>{adoption.dog?.name}</h4>
+                          <p>{adoption.dog?.breed} • {adoption.dog?.age}</p>
+                        </div>
+                      </div>
+                      <div className="vet-adoption-status">
+                        <span className={`status-badge ${adoption.status}`}>
+                          {adoption.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="vet-adoption-details">
+                      <div className="vet-adoption-user">
+                        <Users size={16} />
+                        <span><strong>Adopter:</strong> {adoption.user?.name}</span>
+                      </div>
+                      <div className="vet-adoption-date">
+                        <Calendar size={16} />
+                        <span><strong>Request Date:</strong> {formatDate(adoption.createdAt)}</span>
+                      </div>
+                    </div>
+                    
+                   <div className="vet-adoption-actions">
+        <button 
+          className="vet-btn secondary"
+          onClick={() => handleViewAdoptionDetails(adoption)}
+        >
+          <Eye size={16} />
+          View Details
+        </button>
+        <button 
+          className="vet-btn success"
+          onClick={() => handleCertifyForAdoption(adoption.dog._id, adoption._id, true)}
+        >
+          <Check size={16} />
+          Approve & Certify
+        </button>
+        <button 
+          className="vet-btn danger"
+          onClick={() => handleCertifyForAdoption(adoption.dog._id, adoption._id, false)}
+        >
+          <XCircle size={16} />
+          Reject
+        </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Adoption Details Modal */}
+      {showAdoptionDetails && selectedAdoption && (
+        <div className="vet-modal-overlay">
+          <div className="vet-modal large">
+            <div className="vet-modal-header">
+              <h3>Adoption Request Details</h3>
+              <button className="vet-close-btn" onClick={() => setShowAdoptionDetails(false)}>×</button>
+            </div>
+            <div className="vet-modal-content">
+              <div className="vet-adoption-detail-section">
+                <h4>Dog Information</h4>
+                <div className="vet-adoption-dog-detail">
+                  <img 
+                    src={selectedAdoption.dog?.photo ? `http://localhost:3000/uploads/dogs/${selectedAdoption.dog.photo}` : "https://placehold.co/300x300?text=Dog"} 
+                    alt={selectedAdoption.dog?.name} 
+                  />
+                  <div className="vet-adoption-dog-detail-info">
+                    <p><strong>Name:</strong> {selectedAdoption.dog?.name}</p>
+                    <p><strong>Breed:</strong> {selectedAdoption.dog?.breed}</p>
+                    <p><strong>Age:</strong> {selectedAdoption.dog?.age}</p>
+                    <p><strong>Health Status:</strong> {selectedAdoption.dog?.healthStatus}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="vet-adoption-detail-section">
+                <h4>Adopter Information</h4>
+                <div className="vet-adoption-user-detail">
+                  <p><strong>Name:</strong> {selectedAdoption.user?.name}</p>
+                  <p><strong>Email:</strong> {selectedAdoption.user?.email}</p>
+                  <p><strong>Phone:</strong> {selectedAdoption.user?.phone || "Not provided"}</p>
+                  <p><strong>Address:</strong> {selectedAdoption.user?.address || "Not provided"}</p>
+                </div>
+              </div>
+              
+              <div className="vet-adoption-detail-section">
+                <h4>Adoption Details</h4>
+                <div className="vet-adoption-request-detail">
+                  <p><strong>Request Date:</strong> {formatDate(selectedAdoption.createdAt)}</p>
+                  <p><strong>Status:</strong> {selectedAdoption.status.replace('_', ' ')}</p>
+                  {selectedAdoption.notes && (
+                    <p><strong>Notes:</strong> {selectedAdoption.notes}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="vet-modal-actions">
+              <button className="vet-btn" onClick={() => setShowAdoptionDetails(false)}>Close</button>
+              <button 
+                className="vet-btn success"
+                onClick={() => handleApproveAdoption(selectedAdoption._id)}
+              >
+                Approve Adoption
+              </button>
+              <button 
+                className="vet-btn danger"
+                onClick={() => handleRejectAdoption(selectedAdoption._id)}
+              >
+                Reject Adoption
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing modals for treatment, vaccination, and certification */}
+      {showTreatmentForm && selectedDog && (
+        <div className="vet-modal-overlay">
+          <div className="vet-modal">
+            <div className="vet-modal-header">
+              <h3>Log Treatment for {selectedDog.name}</h3>
+              <button className="vet-close-btn" onClick={() => setShowTreatmentForm(false)}>×</button>
+            </div>
+            <div className="vet-modal-content">
+              <div className="vet-form-group">
+                <label>Diagnosis *</label>
+                <input
+                  type="text"
+                  value={treatmentForm.diagnosis}
+                  onChange={(e) => setTreatmentForm({...treatmentForm, diagnosis: e.target.value})}
+                  placeholder="Enter diagnosis"
+                />
+              </div>
+              <div className="vet-form-group">
+                <label>Treatment *</label>
+                <textarea
+                  value={treatmentForm.treatment}
+                  onChange={(e) => setTreatmentForm({...treatmentForm, treatment: e.target.value})}
+                  placeholder="Describe treatment"
+                  rows="3"
+                />
+              </div>
+              <div className="vet-form-row">
+                <div className="vet-form-group">
+                  <label>Medication</label>
+                  <input
+                    type="text"
+                    value={treatmentForm.medication}
+                    onChange={(e) => setTreatmentForm({...treatmentForm, medication: e.target.value})}
+                    placeholder="Medication name"
+                  />
+                </div>
+                <div className="vet-form-group">
+                  <label>Dosage</label>
+                  <input
+                    type="text"
+                    value={treatmentForm.dosage}
+                    onChange={(e) => setTreatmentForm({...treatmentForm, dosage: e.target.value})}
+                    placeholder="Dosage instructions"
+                  />
+                </div>
+              </div>
+              <div className="vet-form-group">
+                <label>Notes</label>
+                <textarea
+                  value={treatmentForm.notes}
+                  onChange={(e) => setTreatmentForm({...treatmentForm, notes: e.target.value})}
+                  placeholder="Additional notes"
+                  rows="2"
+                />
+              </div>
+            </div>
+            <div className="vet-modal-actions">
+              <button className="vet-btn" onClick={() => setShowTreatmentForm(false)}>Cancel</button>
+              <button className="vet-btn primary" onClick={handleAddTreatment}>Save Treatment</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVaccinationForm && selectedDog && (
+        <div className="vet-modal-overlay">
+          <div className="vet-modal">
+            <div className="vet-modal-header">
+              <h3>Add Vaccination for {selectedDog.name}</h3>
+              <button className="vet-close-btn" onClick={() => setShowVaccinationForm(false)}>×</button>
+            </div>
+            <div className="vet-modal-content">
+              <div className="vet-form-group">
+                <label>Vaccine Type *</label>
+                <select
+                  value={vaccinationForm.vaccineType}
+                  onChange={(e) => setVaccinationForm({...vaccinationForm, vaccineType: e.target.value})}
+                >
+                  <option value="">Select Vaccine Type</option>
+                  <option value="Rabies">Rabies</option>
+                  <option value="DHPP">DHPP (Distemper, Hepatitis, Parainfluenza, Parvovirus)</option>
+                  <option value="Bordetella">Bordetella (Kennel Cough)</option>
+                  <option value="Leptospirosis">Leptospirosis</option>
+                  <option value="Lyme">Lyme Disease</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="vet-form-group">
+                <label>Batch Number *</label>
+                <input
+                  type="text"
+                  value={vaccinationForm.batchNumber}
+                  onChange={(e) => setVaccinationForm({...vaccinationForm, batchNumber: e.target.value})}
+                  placeholder="Enter batch number"
+                />
+              </div>
+              <div className="vet-form-group">
+                <label>Next Due Date</label>
+                <input
+                  type="date"
+                  value={vaccinationForm.nextDueDate}
+                  onChange={(e) => setVaccinationForm({...vaccinationForm, nextDueDate: e.target.value})}
+                />
+              </div>
+              <div className="vet-form-group">
+                <label>Notes</label>
+                <textarea
+                  value={vaccinationForm.notes}
+                  onChange={(e) => setVaccinationForm({...vaccinationForm, notes: e.target.value})}
+                  placeholder="Additional notes"
+                  rows="2"
+                />
+              </div>
+            </div>
+            <div className="vet-modal-actions">
+              <button className="vet-btn" onClick={() => setShowVaccinationForm(false)}>Cancel</button>
+              <button className="vet-btn primary" onClick={handleAddVaccination}>Save Vaccination</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCertificationForm && selectedDog && (
+        <div className="vet-modal-overlay">
+          <div className="vet-modal">
+            <div className="vet-modal-header">
+              <h3>Certify Health for {selectedDog.name}</h3>
+              <button className="vet-close-btn" onClick={() => setShowCertificationForm(false)}>×</button>
+            </div>
+            <div className="vet-modal-content">
+              <div className="vet-form-group">
+                <label>Health Status *</label>
+                <select
+                  value={certificationForm.healthStatus}
+                  onChange={(e) => setCertificationForm({...certificationForm, healthStatus: e.target.value})}
+                >
+                  <option value="Healthy">Healthy</option>
+                  <option value="Recovering">Recovering</option>
+                  <option value="Needs Attention">Needs Attention</option>
+                  <option value="Not Fit">Not Fit for Adoption</option>
+                </select>
+              </div>
+              <div className="vet-form-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={certificationForm.approvalForAdoption}
+                    onChange={(e) => setCertificationForm({...certificationForm, approvalForAdoption: e.target.checked})}
+                  />
+                  Approve for Adoption
+                </label>
+              </div>
+              <div className="vet-form-group">
+                <label>Notes</label>
+                <textarea
+                  value={certificationForm.notes}
+                  onChange={(e) => setCertificationForm({...certificationForm, notes: e.target.value})}
+                  placeholder="Health assessment notes"
+                  rows="3"
+                />
+              </div>
+            </div>
+            <div className="vet-modal-actions">
+              <button className="vet-btn" onClick={() => setShowCertificationForm(false)}>Cancel</button>
+              <button className="vet-btn primary" onClick={handleCertifyHealth}>Certify Health</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VetDashboard;
