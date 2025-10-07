@@ -19,6 +19,15 @@ const {
     updateBlogPost,
     deleteBlogPost
 } = require('../Controlers/VolunteerDashboardController');
+
+
+// Import volunteer management controller
+const {
+    getAssignedDogs,
+    getVolunteerTasks,
+    updateTaskStatus
+} = require('../Controlers/VolunteerManagementController');
+
 const { authenticateToken, requireVolunteer } = require('../middleware/auth');
 
 // Configure multer for file uploads
@@ -66,6 +75,11 @@ router.get('/overview', getVolunteerDashboard);
 // Tasks & Care Management
 router.get('/tasks', getAssignedTasks);
 router.put('/tasks/:taskId/complete', completeTask);
+
+// Volunteer Management Routes (NEW)
+router.get('/assigned-dogs', getAssignedDogs);
+router.get('/tasks', getVolunteerTasks);
+router.put('/tasks/:taskId/status', updateTaskStatus);
 
 // Dogs Management
 router.get('/dogs', getAvailableDogs);

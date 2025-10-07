@@ -1,7 +1,6 @@
 // AdoptionRequestForm.js
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Nav from "../Nav/Nav";
 import "./AdoptionRequestForm.css";
 import { Dog, PawPrint } from "lucide-react";
 import axios from "axios";
@@ -51,8 +50,8 @@ export default function AdoptionRequestForm() {
     if (!formData.phone) {
       newErrors.phone = "Phone number is required";
       isValid = false;
-    } else if (!/^\d{10,12}$/.test(formData.phone.replace(/\D/g, ''))) {
-      newErrors.phone = "Phone number must be 10-12 digits";
+    } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+      newErrors.phone = "Phone number must be exactly 10 digits";
       isValid = false;
     }
 
@@ -122,7 +121,7 @@ export default function AdoptionRequestForm() {
     }
 
     try {
-      // send request to backend
+      // Send request to backend - automatically sets vetReviewStatus to "pending"
       const res = await axios.post("/adoption-requests", {
         ...formData,
         dog: dog._id, // <-- send the real ObjectId

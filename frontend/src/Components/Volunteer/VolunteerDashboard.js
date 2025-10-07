@@ -24,7 +24,13 @@ import {
   Save,
   Trash2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  X,
+  CalendarDays,
+  ClipboardList,
+  Users,
+  Eye,
+  Edit
 } from 'lucide-react';
 import './VolunteerDashboard.css';
 import VolunteerDashboardAPI from '../../api/volunteerDashboardAPI';
@@ -90,18 +96,35 @@ const VolunteerDashboard = () => {
     photos: []
   });
 
+  // Modal states
+  const [showHealthReportModal, setShowHealthReportModal] = useState(false);
+  const [selectedDogForModal, setSelectedDogForModal] = useState(null);
+  const [modalHealthReport, setModalHealthReport] = useState({
+    dogId: '',
+    eatingHabits: 'normal',
+    mood: 'normal',
+    weight: '',
+    observations: '',
+    photos: []
+  });
+
+  // Volunteer Management States (NEW)
+  const [assignedDogs, setAssignedDogs] = useState([]);
+  const [volunteerTasks, setVolunteerTasks] = useState([]);
+  const [showTaskDetails, setShowTaskDetails] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+
   // Check if user is authenticated and load data if valid token exists
   useEffect(() => {
-    const token = localStorage.getItem('authToken'); // Use the standard auth token
+    const token = localStorage.getItem('authToken');
     if (!token) {
-      // User needs to login - show error message instead of auto-login
       console.log('No token found, user needs to login');
       setError('Please login to access the volunteer dashboard.');
       setLoading(false);
       return;
     }
-    // If token exists, load dashboard data
     loadDashboardData();
+    loadVolunteerManagementData(); // NEW: Load volunteer management data
   }, []);
 
   const loadDashboardData = async () => {
@@ -111,39 +134,53 @@ const VolunteerDashboard = () => {
 
       // Load dashboard overview
       const overviewData = await api.getDashboardOverview();
-      setDashboardData(overviewData.data);
-      setUserData(overviewData.data.volunteerInfo);
+      setDashboardData(overviewData?.data || null);
+      setUserData(overviewData?.data?.volunteerInfo || null);
 
       // Load assigned tasks
       const tasksData = await api.getAssignedTasks();
-      setAssignedTasks(tasksData.data.tasksByDog);
+      setAssignedTasks(tasksData?.data?.tasksByDog || []);
 
       // Load available dogs for walking
       const dogsData = await api.getAvailableDogs();
-      setAvailableDogs(dogsData.data.dogs);
+      setAvailableDogs(dogsData?.data?.dogs || []);
 
       // Load walking data
       const walkData = await api.getWalkingData();
-      setWalkingData(walkData.data);
+      setWalkingData(walkData?.data || { 
+        walks: [], 
+        statistics: {},
+        totalDistance: 0,
+        totalDuration: '0h 0m',
+        uniqueDogs: 0,
+        recentWalks: []
+      });
 
       // Load events
       const eventsData = await api.getUpcomingEvents();
-      setEvents(eventsData.data.events);
+      setEvents(eventsData?.data?.events || []);
 
       // Load blog posts
       try {
         const blogData = await api.getBlogPosts();
-        setBlogPosts(Array.isArray(blogData.data?.posts) ? blogData.data.posts : []);
+        setBlogPosts(Array.isArray(blogData?.data?.posts) ? blogData.data.posts : []);
       } catch (blogError) {
         console.error('Failed to load blog posts:', blogError);
-        setBlogPosts([]); // Ensure it's always an array
+        setBlogPosts([]);
       }
 
       // Load health reports
       const healthData = await api.getHealthReports();
-      setHealthReports(healthData.data.reports);
+      setHealthReports(healthData?.data?.reports || []);
+console.log('=== DASHBOARD DATA LOADED ===');
+    console.log('User Data:', overviewData?.data?.volunteerInfo);
+    console.log('Dashboard Data:', overviewData?.data);
+    console.log('Assigned Tasks:', tasksData?.data?.tasksByDog);
+    console.log('Available Dogs:', dogsData?.data?.dogs);
+    console.log('======================');
 
-      // Set sample notifications (these could come from backend too)
+
+      // Set sample notifications
       setNotifications([
         { id: 1, message: 'Your shift starts in 30 minutes', read: false, timestamp: '10 mins ago' },
         { id: 2, message: 'Health report submitted successfully', read: false, timestamp: '45 mins ago' },
@@ -151,12 +188,51 @@ const VolunteerDashboard = () => {
       ]);
 
     } catch (error) {
-      setError('Failed to load dashboard data: ' + error.message);
+      setError('Failed to load dashboard data: ' + (error.message || 'Unknown error'));
       console.error('Dashboard load error:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // NEW: Load volunteer management data
+  const loadVolunteerManagementData = async () => {
+  try {
+    console.log('Loading volunteer management data...');
+    
+    // Load assigned dogs for this volunteer
+    const assignedDogsResponse = await api.getAssignedDogs();
+    console.log('Assigned dogs response:', assignedDogsResponse);
+    setAssignedDogs(assignedDogsResponse?.data || []);
+
+    // Fetch volunteer tasks
+    const tasksResponse = await api.getVolunteerTasks();
+    console.log('Volunteer tasks response:', tasksResponse);
+    setVolunteerTasks(tasksResponse?.data || []);
+
+    // DEBUG: Check volunteer management data
+    console.log('Assigned Dogs:', assignedDogsResponse?.data);
+    console.log('Volunteer Tasks:', tasksResponse?.data);
+    console.log('==============================');
+    
+  } catch (error) {
+    console.error('Error loading volunteer management data:', error);
+    
+    // Fallback: Try to get data from the dashboard overview
+    if (dashboardData?.assignedDogs) {
+       console.log('Using fallback data from dashboard');
+      setAssignedDogs(dashboardData.assignedDogs);
+    }
+    
+    // Set empty arrays as fallback
+    if (assignedDogs.length === 0) {
+      setAssignedDogs([]);
+    }
+    if (volunteerTasks.length === 0) {
+      setVolunteerTasks([]);
+    }
+  }
+};
 
   // Handle window resize for responsive design
   useEffect(() => {
@@ -170,6 +246,66 @@ const VolunteerDashboard = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Add this useEffect to monitor state changes
+useEffect(() => {
+  console.log('=== STATE UPDATES ===');
+  console.log('User Data:', userData);
+  console.log('Assigned Dogs:', assignedDogs);
+  console.log('Volunteer Tasks:', volunteerTasks);
+  console.log('Dashboard Data:', dashboardData);
+  console.log('=====================');
+}, [userData, assignedDogs, volunteerTasks, dashboardData]);
+
+  useEffect(() => {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    console.log('No token found, user needs to login');
+    setError('Please login to access the volunteer dashboard.');
+    setLoading(false);
+    return;
+  }
+  loadDashboardData();
+}, []);
+
+// Load volunteer management data when dashboard data is loaded
+useEffect(() => {
+  if (dashboardData && userData) {
+    loadVolunteerManagementData();
+  }
+}, [dashboardData, userData]);
+
+  // NEW: Task management functions
+  const handleViewTaskDetails = (task) => {
+    setSelectedTask(task);
+    setShowTaskDetails(true);
+  };
+
+  const handleUpdateTaskStatus = async (taskId, status) => {
+  try {
+    console.log('Updating task status:', taskId, status);
+    
+    const response = await api.updateTaskStatus(taskId, status);
+    console.log('Task status update response:', response);
+    
+    // Reload tasks
+    const tasksResponse = await api.getVolunteerTasks();
+    setVolunteerTasks(tasksResponse?.data || []);
+    
+    // Show success message
+    alert(`Task marked as ${status}`);
+    
+  } catch (error) {
+    console.error('Error updating task status:', error);
+    
+    let errorMessage = 'Failed to update task status';
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    }
+    
+    alert(errorMessage);
+  }
+};
+
   const markNotificationRead = (id) => {
     setNotifications(notifications.map(notif => 
       notif.id === id ? { ...notif, read: true } : notif
@@ -179,6 +315,8 @@ const VolunteerDashboard = () => {
   const toggleEventRSVP = async (eventId) => {
     try {
       const event = events.find(e => e._id === eventId);
+      if (!event) return;
+
       if (event.isRegistered) {
         await api.cancelEventRegistration(eventId);
       } else {
@@ -187,7 +325,7 @@ const VolunteerDashboard = () => {
       
       // Reload events data
       const eventsData = await api.getUpcomingEvents();
-      setEvents(eventsData.data.events);
+      setEvents(eventsData?.data?.events || []);
     } catch (error) {
       console.error('Error toggling event RSVP:', error);
       setError('Failed to update event registration');
@@ -200,24 +338,87 @@ const VolunteerDashboard = () => {
       
       // Reload tasks and dashboard data
       const tasksData = await api.getAssignedTasks();
-      setAssignedTasks(tasksData.data.tasksByDog);
+      setAssignedTasks(tasksData?.data?.tasksByDog || []);
       
       const overviewData = await api.getDashboardOverview();
-      setDashboardData(overviewData.data);
+      setDashboardData(overviewData?.data || null);
     } catch (error) {
       console.error('Error completing task:', error);
       setError('Failed to complete task');
     }
   };
 
+  // Open health report modal
+  const openHealthReportModal = (dog) => {
+    setSelectedDogForModal(dog);
+    setModalHealthReport({
+      dogId: dog._id,
+      eatingHabits: 'normal',
+      mood: 'normal',
+      weight: '',
+      observations: '',
+      photos: []
+    });
+    setShowHealthReportModal(true);
+  };
+
+  // Close health report modal
+  const closeHealthReportModal = () => {
+    setShowHealthReportModal(false);
+    setSelectedDogForModal(null);
+    setModalHealthReport({
+      dogId: '',
+      eatingHabits: 'normal',
+      mood: 'normal',
+      weight: '',
+      observations: '',
+      photos: []
+    });
+  };
+
+  // Handle health report submission from modal
+  const handleModalHealthReportSubmit = async () => {
+    try {
+      if (!modalHealthReport.dogId) {
+        alert('Please select a dog');
+        return;
+      }
+
+      const formData = api.createHealthReportFormData(modalHealthReport, modalHealthReport.photos || []);
+      await api.submitHealthReport(formData);
+      
+      // Close modal and reload data
+      closeHealthReportModal();
+      
+      const healthData = await api.getHealthReports();
+      setHealthReports(healthData?.data?.reports || []);
+      
+      const overviewData = await api.getDashboardOverview();
+      setDashboardData(overviewData?.data || null);
+      
+      alert('Health report submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting health report:', error);
+      setError('Failed to submit health report');
+    }
+  };
+
+  // Original health report handler (kept for compatibility)
   const handleHealthReportSubmit = async (dogId, reportData = null) => {
     try {
       const data = reportData || healthReport;
-      if (!data.dogId && dogId) {
-        data.dogId = dogId;
+      const finalData = { ...data };
+      
+      if (!finalData.dogId && dogId) {
+        finalData.dogId = dogId;
       }
 
-      const formData = api.createHealthReportFormData(data, data.photos || []);
+      if (!finalData.dogId) {
+        alert('Please select a dog');
+        return;
+      }
+
+      const formData = api.createHealthReportFormData(finalData, finalData.photos || []);
       await api.submitHealthReport(formData);
       
       // Reset form and reload data
@@ -231,10 +432,10 @@ const VolunteerDashboard = () => {
       });
       
       const healthData = await api.getHealthReports();
-      setHealthReports(healthData.data.reports);
+      setHealthReports(healthData?.data?.reports || []);
       
       const overviewData = await api.getDashboardOverview();
-      setDashboardData(overviewData.data);
+      setDashboardData(overviewData?.data || null);
       
       alert('Health report submitted successfully!');
     } catch (error) {
@@ -259,10 +460,9 @@ const VolunteerDashboard = () => {
       
       try {
         const blogData = await api.getBlogPosts();
-        setBlogPosts(Array.isArray(blogData.data?.posts) ? blogData.data.posts : []);
+        setBlogPosts(Array.isArray(blogData?.data?.posts) ? blogData.data.posts : []);
       } catch (reloadError) {
         console.error('Failed to reload blog posts after creation:', reloadError);
-        // Don't throw here, just log the error
       }
       
       alert('Blog post submitted successfully!');
@@ -274,23 +474,58 @@ const VolunteerDashboard = () => {
 
   const handleWalkLog = async () => {
     try {
-      if (!walkLog.dogId || !walkLog.distance || !walkLog.duration || !walkLog.walkDate || !walkLog.walkTime) {
-        alert('Please fill in all required fields (Dog, Distance, Duration, Date, Time)');
+      if (!walkLog.dogId) {
+        alert('Please select a dog');
         return;
       }
-
+      if (!walkLog.distance || parseFloat(walkLog.distance) <= 0) {
+        alert('Please enter a valid distance (greater than 0 km)');
+        return;
+      }
+      if (!walkLog.duration || parseInt(walkLog.duration) <= 0) {
+        alert('Please enter a valid duration (greater than 0 minutes)');
+        return;
+      }
+      if (!walkLog.walkDate) {
+        alert('Please select a date');
+        return;
+      }
+      if (!walkLog.walkTime) {
+        alert('Please select a time');
+        return;
+      }
       if (walkLog.activities.length === 0) {
         alert('Please select at least one activity');
         return;
       }
 
+      console.log('Submitting walk data:', walkLog);
+
       const walkData = {
-        ...walkLog,
+        dogId: walkLog.dogId,
         distance: parseFloat(walkLog.distance),
-        duration: parseInt(walkLog.duration)
+        duration: parseInt(walkLog.duration),
+        activities: walkLog.activities,
+        walkDate: walkLog.walkDate,
+        walkTime: walkLog.walkTime,
+        route: walkLog.route || '',
+        notes: walkLog.notes || '',
+        weather: walkLog.weather || '',
+        walkQuality: walkLog.walkQuality || 'good',
+        dogBehavior: walkLog.dogBehavior || 'calm',
+        startTime: new Date(`${walkLog.walkDate}T${walkLog.walkTime}`).toISOString(),
+        endTime: new Date(new Date(`${walkLog.walkDate}T${walkLog.walkTime}`).getTime() + parseInt(walkLog.duration) * 60000).toISOString()
       };
 
+      console.log('Processed walk data:', walkData);
+
       const formData = api.createWalkFormData(walkData);
+      
+      console.log('FormData contents:');
+      for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+      }
+
       await api.logWalk(formData);
       
       // Reset form and reload data
@@ -310,30 +545,55 @@ const VolunteerDashboard = () => {
         endTime: ''
       });
       
-      const walkData_updated = await api.getWalkingData();
-      setWalkingData(walkData_updated.data);
+      // Reload walking data
+      const walkDataUpdated = await api.getWalkingData();
+      setWalkingData(walkDataUpdated?.data || { 
+        walks: [], 
+        statistics: {},
+        totalDistance: 0,
+        totalDuration: '0h 0m',
+        uniqueDogs: 0,
+        recentWalks: []
+      });
       
+      // Reload dashboard data
       const overviewData = await api.getDashboardOverview();
-      setDashboardData(overviewData.data);
+      setDashboardData(overviewData?.data || null);
       
       alert('Walk logged successfully!');
     } catch (error) {
       console.error('Error logging walk:', error);
-      setError('Failed to log walk');
+      
+      let errorMessage = 'Failed to log walk';
+      if (error.response) {
+        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
+      } else if (error.request) {
+        errorMessage = 'Network error: Could not connect to server';
+      } else {
+        errorMessage = error.message || 'Unknown error occurred';
+      }
+      
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
     }
   };
 
   const handleEditBlogPost = async (postId) => {
     try {
-      // Find the post to edit
       const postToEdit = blogPosts.find(post => post._id === postId);
       if (postToEdit) {
         setNewBlogPost({
-          title: postToEdit.title,
-          content: postToEdit.content
+          title: postToEdit.title || '',
+          content: postToEdit.content || ''
         });
         setShowNewPostForm(true);
-        // You might want to add an editing state here
+        
+        // Scroll to the form
+        setTimeout(() => {
+          document.querySelector('.v-dash-new-post-form')?.scrollIntoView({ 
+            behavior: 'smooth' 
+          });
+        }, 100);
       }
     } catch (error) {
       console.error('Error preparing blog post for edit:', error);
@@ -343,28 +603,21 @@ const VolunteerDashboard = () => {
 
   const handleDeleteBlogPost = async (postId) => {
     try {
-      if (window.confirm('Are you sure you want to delete this blog post?')) {
+      if (window.confirm('Are you sure you want to delete this blog post? This action cannot be undone.')) {
         await api.deleteBlogPost(postId);
         
-        // Reload blog posts
-        try {
-          const updatedBlogPosts = await api.getBlogPosts();
-          setBlogPosts(Array.isArray(updatedBlogPosts.data?.posts) ? updatedBlogPosts.data.posts : []);
-        } catch (reloadError) {
-          console.error('Failed to reload blog posts after deletion:', reloadError);
-          // Don't throw here, deletion was successful
-        }
+        // Remove from local state immediately for better UX
+        setBlogPosts(prevPosts => prevPosts.filter(post => post._id !== postId));
         
         alert('Blog post deleted successfully!');
       }
     } catch (error) {
       console.error('Error deleting blog post:', error);
       
-      // Show more specific error messages
       let errorMessage = 'Failed to delete blog post';
       if (error.message) {
         if (error.message.includes('Cannot delete blog post with status')) {
-          errorMessage = error.message;
+          errorMessage = 'Cannot delete published blog posts';
         } else if (error.message.includes('not found or you do not have permission')) {
           errorMessage = 'Blog post not found or you do not have permission to delete it';
         } else if (error.message.includes('Blog post not found')) {
@@ -376,24 +629,35 @@ const VolunteerDashboard = () => {
       
       alert(errorMessage);
       setError(errorMessage);
+      
+      // Reload blog posts to ensure consistency
+      try {
+        const blogData = await api.getBlogPosts();
+        setBlogPosts(Array.isArray(blogData?.data?.posts) ? blogData.data.posts : []);
+      } catch (reloadError) {
+        console.error('Failed to reload blog posts:', reloadError);
+      }
     }
   };
 
   const calculateTotalTime = (currentTime, newDuration) => {
-    // Simple time addition for demo purposes
-    const [currentHours, currentMins] = currentTime.split('h ');
-    const [newHours, newMins] = newDuration.split(':');
-    
-    const totalHours = parseInt(currentHours) + parseInt(newHours);
-    const totalMins = parseInt(currentMins) + parseInt(newMins);
-    
-    return `${totalHours}h ${totalMins}m`;
+    try {
+      const [currentHours, currentMins] = currentTime.split('h ');
+      const [newHours, newMins] = newDuration.split(':');
+      
+      const totalHours = parseInt(currentHours || 0) + parseInt(newHours || 0);
+      const totalMins = parseInt(currentMins || 0) + parseInt(newMins || 0);
+      
+      return `${totalHours}h ${totalMins}m`;
+    } catch (error) {
+      console.error('Error calculating total time:', error);
+      return currentTime;
+    }
   };
 
   // Helper: robustly extract the dog id from a health report
   const getReportDogId = (report) => {
     if (!report) return '';
-    // Common cases: populated dogId object, plain string id, or alternate 'dog'
     if (report.dogId) {
       if (typeof report.dogId === 'string') return report.dogId;
       if (typeof report.dogId === 'object' && report.dogId._id) return report.dogId._id;
@@ -402,23 +666,598 @@ const VolunteerDashboard = () => {
       if (typeof report.dog === 'string') return report.dog;
       if (typeof report.dog === 'object' && (report.dog._id || report.dog.id)) return report.dog._id || report.dog.id;
     }
-    // Fallbacks for potential backend variations
     return report.dog_id || report.dogID || '';
   };
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to log out?')) {
-      localStorage.removeItem('authToken'); // Use the standard auth token
+      localStorage.removeItem('authToken');
       localStorage.removeItem('userRole');
-      // Redirect to login page
       window.location.href = '/login';
     }
   };
 
   const handleDownloadReport = () => {
     alert('Downloading volunteer report...');
-    // In a real app, this would generate and download a PDF
   };
+
+  // NEW: Render Volunteer Management Section
+  const renderVolunteerManagement = () => {
+    return(
+    
+    <section className="v-dash-section">
+      <div className="v-dash-section-header">
+        <h2 style={{ 
+          fontSize: '2rem', 
+          fontWeight: '700', 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          marginBottom: '8px'
+        }}>
+          👥 Volunteer Management
+        </h2>
+        <p style={{ 
+          fontSize: '1.1rem', 
+          color: '#64748b',
+          fontWeight: '400'
+        }}>
+          Manage your assigned dogs and tasks
+        </p>
+      </div>
+
+      {/* Assigned Dogs Section */}
+      <div style={{ marginBottom: '32px' }}>
+        <h3 style={{ 
+          fontSize: '1.5rem', 
+          fontWeight: '600',
+          color: '#1f2937',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <PawPrint size={24} />
+          Your Assigned Dogs
+        </h3>
+        
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+          gap: '20px'
+        }}>
+          {assignedDogs.length > 0 ? assignedDogs.map((assignment) => (
+            <div 
+              key={assignment.dogId?._id || assignment._id}
+              style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '16px',
+                padding: '20px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.8)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '16px',
+                marginBottom: '16px'
+              }}>
+                <img 
+                  src={assignment.dogId?.photo ? `http://localhost:3000/uploads/dogs/${assignment.dogId.photo}` : 'https://placedog.net/300/300?id=1'} 
+                  alt={assignment.dogId?.name}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '3px solid #ffffff',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ 
+                    fontSize: '1.25rem', 
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    margin: '0 0 4px 0'
+                  }}>
+                    {assignment.dogId?.name}
+                  </h4>
+                  <p style={{ 
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: '0'
+                  }}>
+                    {assignment.dogId?.breed || 'Mixed Breed'}
+                  </p>
+                </div>
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{
+                  padding: '4px 12px',
+                  backgroundColor: '#dbeafe',
+                  color: '#3b82f6',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: '600'
+                }}>
+                  Assigned
+                </span>
+                <button 
+                  onClick={() => openHealthReportModal(assignment.dogId)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                >
+                  Health Report
+                </button>
+              </div>
+            </div>
+          )) : (
+            <div style={{
+              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '16px',
+              padding: '40px 20px',
+              textAlign: 'center',
+              border: '2px dashed #e5e7eb'
+            }}>
+              <PawPrint size={48} color="#9ca3af" />
+              <h4 style={{ 
+                fontSize: '1.125rem', 
+                fontWeight: '600',
+                color: '#6b7280',
+                margin: '16px 0 8px 0'
+              }}>
+                No Dogs Assigned
+              </h4>
+              <p style={{ 
+                fontSize: '0.875rem',
+                color: '#9ca3af',
+                margin: '0'
+              }}>
+                You haven't been assigned any dogs yet.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tasks Section */}
+      <div>
+        <h3 style={{ 
+          fontSize: '1.5rem', 
+          fontWeight: '600',
+          color: '#1f2937',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <ClipboardList size={24} />
+          Your Tasks
+        </h3>
+        
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+          gap: '20px'
+        }}>
+          {volunteerTasks.length > 0 ? volunteerTasks.map((task) => (
+            <div 
+              key={task._id}
+              style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '16px',
+                padding: '20px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.8)',
+                transition: 'all 0.3s ease',
+                borderLeft: `4px solid ${
+                  task.status === 'completed' ? '#10b981' : 
+                  task.status === 'in-progress' ? '#3b82f6' : 
+                  '#f59e0b'
+                }`
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '12px'
+              }}>
+                <h4 style={{ 
+                  fontSize: '1.125rem', 
+                  fontWeight: '600',
+                  color: '#1f2937',
+                  margin: '0'
+                }}>
+                  {task.taskType}
+                </h4>
+                <span style={{
+                  padding: '4px 12px',
+                  backgroundColor: 
+                    task.status === 'completed' ? '#dcfce7' : 
+                    task.status === 'in-progress' ? '#dbeafe' : 
+                    '#fef3c7',
+                  color: 
+                    task.status === 'completed' ? '#166534' : 
+                    task.status === 'in-progress' ? '#1e40af' : 
+                    '#92400e',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  textTransform: 'capitalize'
+                }}>
+                  {task.status}
+                </span>
+              </div>
+              
+              {task.taskDescription && (
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  marginBottom: '12px',
+                  lineHeight: '1.4'
+                }}>
+                  {task.taskDescription}
+                </p>
+              )}
+              
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px'
+              }}>
+                <div>
+                  <p style={{ 
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    margin: '0 0 4px 0'
+                  }}>
+                    Scheduled
+                  </p>
+                  <p style={{ 
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    margin: '0',
+                    fontWeight: '500'
+                  }}>
+                    {task.scheduledTime ? new Date(task.scheduledTime).toLocaleString() : 'Not scheduled'}
+                  </p>
+                </div>
+                
+                {task.priority && (
+                  <div>
+                    <p style={{ 
+                      fontSize: '0.75rem',
+                      color: '#9ca3af',
+                      margin: '0 0 4px 0',
+                      textAlign: 'right'
+                    }}>
+                      Priority
+                    </p>
+                    <span style={{
+                      padding: '2px 8px',
+                      backgroundColor: 
+                        task.priority === 'high' ? '#fef2f2' : 
+                        task.priority === 'medium' ? '#fffbeb' : 
+                        '#f0fdf4',
+                      color: 
+                        task.priority === 'high' ? '#dc2626' : 
+                        task.priority === 'medium' ? '#d97706' : 
+                        '#16a34a',
+                      borderRadius: '8px',
+                      fontSize: '0.7rem',
+                      fontWeight: '600',
+                      textTransform: 'capitalize'
+                    }}>
+                      {task.priority}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                gap: '8px',
+                justifyContent: 'flex-end'
+              }}>
+                <button 
+                  onClick={() => handleViewTaskDetails(task)}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: 'transparent',
+                    color: '#6b7280',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.color = '#374151';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#6b7280';
+                  }}
+                >
+                  <Eye size={12} style={{ marginRight: '4px' }} />
+                  Details
+                </button>
+                
+                {task.status !== 'completed' && (
+                  <button 
+                    onClick={() => handleUpdateTaskStatus(task._id, 'completed')}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                  >
+                    Complete
+                  </button>
+                )}
+              </div>
+            </div>
+          )) : (
+            <div style={{
+              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '16px',
+              padding: '40px 20px',
+              textAlign: 'center',
+              border: '2px dashed #e5e7eb'
+            }}>
+              <ClipboardList size={48} color="#9ca3af" />
+              <h4 style={{ 
+                fontSize: '1.125rem', 
+                fontWeight: '600',
+                color: '#6b7280',
+                margin: '16px 0 8px 0'
+              }}>
+                No Tasks Assigned
+              </h4>
+              <p style={{ 
+                fontSize: '0.875rem',
+                color: '#9ca3af',
+                margin: '0'
+              }}>
+                You don't have any tasks assigned at the moment.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+  // NEW: Task Details Modal
+  const renderTaskDetailsModal = () => (
+    showTaskDetails && selectedTask && (
+      <div className="v-dash-modal-overlay">
+        <div className="v-dash-modal">
+          <div className="v-dash-modal-header">
+            <h3>Task Details</h3>
+            <button 
+              className="v-dash-modal-close"
+              onClick={() => setShowTaskDetails(false)}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="v-dash-modal-content">
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ 
+                fontSize: '1.25rem', 
+                fontWeight: '600',
+                color: '#1f2937',
+                marginBottom: '8px'
+              }}>
+                {selectedTask.taskType}
+              </h4>
+              <span style={{
+                padding: '4px 12px',
+                backgroundColor: 
+                  selectedTask.status === 'completed' ? '#dcfce7' : 
+                  selectedTask.status === 'in-progress' ? '#dbeafe' : 
+                  '#fef3c7',
+                color: 
+                  selectedTask.status === 'completed' ? '#166534' : 
+                  selectedTask.status === 'in-progress' ? '#1e40af' : 
+                  '#92400e',
+                borderRadius: '12px',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                textTransform: 'capitalize'
+              }}>
+                {selectedTask.status}
+              </span>
+            </div>
+            
+            {selectedTask.taskDescription && (
+              <div style={{ marginBottom: '16px' }}>
+                <h5 style={{ 
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}>
+                  Description
+                </h5>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: '0',
+                  lineHeight: '1.5'
+                }}>
+                  {selectedTask.taskDescription}
+                </p>
+              </div>
+            )}
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+              marginBottom: '16px'
+            }}>
+              <div>
+                <h5 style={{ 
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '4px'
+                }}>
+                  Scheduled Time
+                </h5>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: '0'
+                }}>
+                  {selectedTask.scheduledTime ? new Date(selectedTask.scheduledTime).toLocaleString() : 'Not scheduled'}
+                </p>
+              </div>
+              
+              <div>
+                <h5 style={{ 
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '4px'
+                }}>
+                  Priority
+                </h5>
+                <span style={{
+                  padding: '2px 8px',
+                  backgroundColor: 
+                    selectedTask.priority === 'high' ? '#fef2f2' : 
+                    selectedTask.priority === 'medium' ? '#fffbeb' : 
+                    '#f0fdf4',
+                  color: 
+                    selectedTask.priority === 'high' ? '#dc2626' : 
+                    selectedTask.priority === 'medium' ? '#d97706' : 
+                    '#16a34a',
+                  borderRadius: '8px',
+                  fontSize: '0.7rem',
+                  fontWeight: '600',
+                  textTransform: 'capitalize'
+                }}>
+                  {selectedTask.priority || 'Normal'}
+                </span>
+              </div>
+            </div>
+            
+            {selectedTask.estimatedDuration && (
+              <div style={{ marginBottom: '16px' }}>
+                <h5 style={{ 
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '4px'
+                }}>
+                  Estimated Duration
+                </h5>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: '0'
+                }}>
+                  {selectedTask.estimatedDuration} minutes
+                </p>
+              </div>
+            )}
+            
+            {selectedTask.assignedDate && (
+              <div>
+                <h5 style={{ 
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '4px'
+                }}>
+                  Assigned Date
+                </h5>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: '0'
+                }}>
+                  {new Date(selectedTask.assignedDate).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="v-dash-modal-actions">
+            <button 
+              className="v-dash-secondary-btn"
+              onClick={() => setShowTaskDetails(false)}
+            >
+              Close
+            </button>
+            {selectedTask.status !== 'completed' && (
+              <button 
+                className="v-dash-primary-btn"
+                onClick={() => {
+                  handleUpdateTaskStatus(selectedTask._id, 'completed');
+                  setShowTaskDetails(false);
+                }}
+              >
+                Mark Complete
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  );
 
   // Show loading spinner
   if (loading) {
@@ -454,6 +1293,162 @@ const VolunteerDashboard = () => {
 
   return (
     <div className="v-dash-container">
+      {/* Health Report Modal */}
+      {showHealthReportModal && (
+        <div className="v-dash-modal-overlay">
+          <div className="v-dash-modal">
+            <div className="v-dash-modal-header">
+              <h3>Submit Health Report</h3>
+              <button 
+                className="v-dash-modal-close"
+                onClick={closeHealthReportModal}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="v-dash-modal-content">
+              {selectedDogForModal && (
+                <div className="v-dash-modal-dog-info">
+                  <img 
+                    src={selectedDogForModal.photo ? `http://localhost:3000/uploads/dogs/${selectedDogForModal.photo}` : 'https://placedog.net/300/300?id=1'} 
+                    alt={selectedDogForModal.name}
+                  />
+                  <div>
+                    <h4>{selectedDogForModal.name}</h4>
+                    <p>Health Status: {selectedDogForModal.healthStatus || 'Unknown'}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="v-dash-form-group">
+                <label>Eating Habits</label>
+                <select 
+                  value={modalHealthReport.eatingHabits}
+                  onChange={(e) => setModalHealthReport({...modalHealthReport, eatingHabits: e.target.value})}
+                >
+                  <option value="normal">Normal</option>
+                  <option value="reduced">Reduced</option>
+                  <option value="increased">Increased</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Mood/Behavior</label>
+                <select 
+                  value={modalHealthReport.mood}
+                  onChange={(e) => setModalHealthReport({...modalHealthReport, mood: e.target.value})}
+                >
+                  <option value="playful">Playful</option>
+                  <option value="quiet">Quiet</option>
+                  <option value="anxious">Anxious</option>
+                  <option value="aggressive">Aggressive</option>
+                  <option value="depressed">Depressed</option>
+                  <option value="normal">Normal</option>
+                </select>
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Weight (kg)</label>
+                <input 
+                  type="number" 
+                  value={modalHealthReport.weight}
+                  onChange={(e) => setModalHealthReport({...modalHealthReport, weight: e.target.value})}
+                  placeholder="Enter weight"
+                />
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Observations</label>
+                <textarea 
+                  value={modalHealthReport.observations}
+                  onChange={(e) => setModalHealthReport({...modalHealthReport, observations: e.target.value})}
+                  placeholder="Enter any observations here..."
+                  rows="3"
+                />
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Upload Photos</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button 
+                    type="button"
+                    className="v-dash-secondary-btn"
+                    onClick={() => document.getElementById('modal-health-photo-input').click()}
+                    style={{ 
+                      padding: '12px 16px', 
+                      border: '2px dashed #ccc', 
+                      backgroundColor: '#f9f9f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Upload size={18} />
+                    <span>Choose Photos</span>
+                  </button>
+                  
+                  <input 
+                    id="modal-health-photo-input"
+                    type="file" 
+                    accept="image/*" 
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={(e) => setModalHealthReport({...modalHealthReport, photos: Array.from(e.target.files || [])})}
+                  />
+                  
+                  {Array.isArray(modalHealthReport.photos) && modalHealthReport.photos.length > 0 && (
+                    <div style={{ marginTop: '8px' }}>
+                      <small style={{ color: '#666', display: 'block', marginBottom: '8px' }}>
+                        {modalHealthReport.photos.length} photo(s) selected:
+                      </small>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {modalHealthReport.photos.map((file, index) => (
+                          <span 
+                            key={index} 
+                            style={{ 
+                              padding: '4px 8px', 
+                              backgroundColor: '#e3f2fd', 
+                              borderRadius: '4px', 
+                              fontSize: '12px',
+                              color: '#1976d2'
+                            }}
+                          >
+                            {file.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="v-dash-modal-actions">
+              <button 
+                className="v-dash-secondary-btn"
+                onClick={closeHealthReportModal}
+              >
+                Cancel
+              </button>
+              <button 
+                className="v-dash-primary-btn"
+                onClick={handleModalHealthReportSubmit}
+              >
+                Submit Health Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Details Modal */}
+      {renderTaskDetailsModal()}
+
       {/* Header */}
       <header className="v-dash-header">
         <div className="v-dash-mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -462,7 +1457,7 @@ const VolunteerDashboard = () => {
         
         <div className="v-dash-brand">
           <PawPrint size={28} />
-          <h1>Pawsome Shelter</h1>
+          <h1>StreetToSweet Shelter</h1>
         </div>
         
         <div className="v-dash-header-actions">
@@ -508,15 +1503,15 @@ const VolunteerDashboard = () => {
           
           <div className="v-dash-user">
             <div className="v-dash-user-info">
-              <span className="v-dash-user-name">{userData.name}</span>
-              <span className="v-dash-user-role">{userData.role}</span>
+              <span className="v-dash-user-name">{userData.name || 'User'}</span>
+              <span className="v-dash-user-role">{userData.role || 'Volunteer'}</span>
             </div>
             <div 
               className="v-dash-user-avatar"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
               {userData.profilePic ? (
-                <img src={userData.profilePic} alt={userData.name} />
+                <img src={userData.profilePic} alt={userData.name || 'User'} />
               ) : (
                 <User size={32} />
               )}
@@ -526,13 +1521,13 @@ const VolunteerDashboard = () => {
             {showUserMenu && (
               <div className="v-dash-user-menu">
                 <div className="v-dash-user-details">
-                  <h4>{userData.name}</h4>
-                  <p>{userData.role}</p>
+                  <h4>{userData.name || 'User'}</h4>
+                  <p>{userData.role || 'Volunteer'}</p>
                   <div className="v-dash-user-contact">
-                    <Mail size={14} /> {userData.email}
+                    <Mail size={14} /> {userData.email || 'No email'}
                   </div>
                   <div className="v-dash-user-contact">
-                    <Phone size={14} /> {userData.phone}
+                    <Phone size={14} /> {userData.phone || 'No phone'}
                   </div>
                 </div>
                 <button className="v-dash-menu-item">
@@ -575,15 +1570,16 @@ const VolunteerDashboard = () => {
               <span>Tasks & Care</span>
             </button>
             
+            {/* NEW: Volunteer Management Navigation Item */}
             <button 
-              className={`v-dash-nav-item ${activeSection === 'health' ? 'active' : ''}`}
+              className={`v-dash-nav-item ${activeSection === 'volunteer-management' ? 'active' : ''}`}
               onClick={() => {
-                setActiveSection('health');
+                setActiveSection('volunteer-management');
                 setMobileMenuOpen(false);
               }}
             >
-              <Heart size={20} />
-              <span>Health Reports</span>
+              <Users size={20} />
+              <span>My Assignments</span>
             </button>
             
             <button 
@@ -640,7 +1636,7 @@ const VolunteerDashboard = () => {
             <section className="v-dash-section">
               <div className="v-dash-section-header">
                 <h2>Dashboard Overview</h2>
-                <p>Welcome back, {userData.name}! Here's what's happening today.</p>
+                <p>Welcome back, {userData.name || 'User'}! Here's what's happening today.</p>
               </div>
               
               <div className="v-dash-stats-grid">
@@ -731,9 +1727,9 @@ const VolunteerDashboard = () => {
                   {dashboardData?.upcomingTasks?.map(task => (
                     <div key={task._id} className="v-dash-task-item">
                       <div className="v-dash-task-info">
-                        <img src={task.dogId?.photo || 'https://placedog.net/300/300?id=1'} alt={task.dogId?.name} className="v-dash-task-dog-img" />
+                        <img src={task.dogId?.photo || 'https://placedog.net/300/300?id=1'} alt={task.dogId?.name || 'Dog'} className="v-dash-task-dog-img" />
                         <div>
-                          <h4>{task.dogId?.name} - {task.taskType}</h4>
+                          <h4>{task.dogId?.name || 'Unknown Dog'} - {task.taskType}</h4>
                           <p>{new Date(task.scheduledTime).toLocaleString()}</p>
                         </div>
                       </div>
@@ -1050,7 +2046,7 @@ const VolunteerDashboard = () => {
                             </div>
                           </div>
                         ))}
-                        {!(Array.isArray(healthReports) && healthReports.some(r => getReportDogId(r) === dogGroup.dog._id)) && (
+                        {!(Array.isArray(healthReports) && healthReports.filter(r => getReportDogId(r) === dogGroup.dog._id).length > 0) && (
                           <p style={{ 
                             fontSize: '0.85rem',
                             color: '#9ca3af',
@@ -1067,10 +2063,7 @@ const VolunteerDashboard = () => {
 
                     {/* Action Button */}
                     <button 
-                      onClick={() => {
-                        setActiveSection('health');
-                        setHealthReport({...healthReport, dogId: dogGroup.dog._id});
-                      }}
+                      onClick={() => openHealthReportModal(dogGroup.dog)}
                       style={{
                         width: '100%',
                         padding: '14px 20px',
@@ -1272,7 +2265,7 @@ const VolunteerDashboard = () => {
                               </div>
                             </div>
                           ))}
-                          {!(Array.isArray(healthReports) && healthReports.some(r => getReportDogId(r) === dog._id)) && (
+                          {!(Array.isArray(healthReports) && healthReports.filter(r => getReportDogId(r) === dog._id).length > 0) && (
                             <p style={{ 
                               fontSize: '0.85rem',
                               color: '#9ca3af',
@@ -1289,10 +2282,7 @@ const VolunteerDashboard = () => {
 
                       {/* Action Button */}
                       <button
-                        onClick={() => {
-                          setActiveSection('health');
-                          setHealthReport({ ...healthReport, dogId: dog._id });
-                        }}
+                        onClick={() => openHealthReportModal(dog)}
                         style={{
                           width: '100%',
                           padding: '14px 20px',
@@ -1326,6 +2316,9 @@ const VolunteerDashboard = () => {
               </div>
             </section>
           )}
+
+          {/* NEW: Volunteer Management Section */}
+          {activeSection === 'volunteer-management' && renderVolunteerManagement()}
           
           {/* Health Reports Section */}
           {activeSection === 'health' && (
@@ -1345,123 +2338,12 @@ const VolunteerDashboard = () => {
                         <span className={`status-indicator ${dogGroup.dog.healthStatus?.toLowerCase().replace(' ', '-')}`}>{dogGroup.dog.healthStatus || 'Unknown'}</span>
                       </div>
                       
-                      <div className="v-dash-health-form">
-                        <div className="v-dash-form-group">
-                          <label>Eating Habits</label>
-                          <select 
-                            value={healthReport.dogId === dogGroup.dog._id ? healthReport.eatingHabits : 'normal'}
-                            onChange={(e) => {
-                              // If user starts typing on this dog's form, set the dogId implicitly
-                              if (healthReport.dogId !== dogGroup.dog._id) {
-                                setHealthReport({...healthReport, dogId: dogGroup.dog._id, eatingHabits: e.target.value});
-                              } else {
-                                setHealthReport({...healthReport, eatingHabits: e.target.value});
-                              }
-                            }}
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="reduced">Reduced</option>
-                            <option value="increased">Increased</option>
-                            <option value="none">None</option>
-                          </select>
-                        </div>
-                        
-                        <div className="v-dash-form-group">
-                          <label>Mood/Behavior</label>
-                          <select 
-                            value={healthReport.dogId === dogGroup.dog._id ? healthReport.mood : 'normal'}
-                            onChange={(e) => {
-                              if (healthReport.dogId !== dogGroup.dog._id) {
-                                setHealthReport({...healthReport, dogId: dogGroup.dog._id, mood: e.target.value});
-                              } else {
-                                setHealthReport({...healthReport, mood: e.target.value});
-                              }
-                            }}
-                          >
-                            <option value="playful">Playful</option>
-                            <option value="quiet">Quiet</option>
-                            <option value="anxious">Anxious</option>
-                            <option value="aggressive">Aggressive</option>
-                            <option value="depressed">Depressed</option>
-                            <option value="normal">Normal</option>
-                          </select>
-                        </div>
-                        
-                        <div className="v-dash-form-group">
-                          <label>Weight (kg)</label>
-                          <input 
-                            type="number" 
-                            value={healthReport.dogId === dogGroup.dog._id ? healthReport.weight : ''}
-                            onChange={(e) => {
-                              if (healthReport.dogId !== dogGroup.dog._id) {
-                                setHealthReport({...healthReport, dogId: dogGroup.dog._id, weight: e.target.value});
-                              } else {
-                                setHealthReport({...healthReport, weight: e.target.value});
-                              }
-                            }}
-                            placeholder="Enter weight"
-                          />
-                        </div>
-                        
-                        <div className="v-dash-form-group">
-                          <label>Observations</label>
-                          <textarea 
-                            value={healthReport.dogId === dogGroup.dog._id ? healthReport.observations : ''}
-                            onChange={(e) => {
-                              if (healthReport.dogId !== dogGroup.dog._id) {
-                                setHealthReport({...healthReport, dogId: dogGroup.dog._id, observations: e.target.value});
-                              } else {
-                                setHealthReport({...healthReport, observations: e.target.value});
-                              }
-                            }}
-                            placeholder="Enter any observations here..."
-                          />
-                        </div>
-                        
-                        <div className="v-dash-form-group">
-                          <label>Upload Photo</label>
-                          <div className="v-dash-upload-area" style={{ position: 'relative', cursor: 'pointer' }}>
-                            <div style={{ pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                              <Upload size={18} />
-                              <span>Click to upload or drag and drop</span>
-                            </div>
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              multiple
-                              style={{ 
-                                position: 'absolute', 
-                                top: 0, 
-                                left: 0, 
-                                width: '100%', 
-                                height: '100%', 
-                                opacity: 0, 
-                                cursor: 'pointer',
-                                zIndex: 10
-                              }}
-                              onChange={(e) => {
-                                if (healthReport.dogId !== dogGroup.dog._id) {
-                                  setHealthReport({...healthReport, dogId: dogGroup.dog._id, photos: Array.from(e.target.files)});
-                                } else {
-                                  setHealthReport({...healthReport, photos: Array.from(e.target.files)});
-                                }
-                              }}
-                            />
-                          </div>
-                          {healthReport.dogId === dogGroup.dog._id && Array.isArray(healthReport.photos) && healthReport.photos.length > 0 && (
-                            <small style={{ display: 'block', marginTop: '6px', color: '#666' }}>
-                              {healthReport.photos.length} photo(s) selected
-                            </small>
-                          )}
-                        </div>
-                        
-                        <button 
-                          className="v-dash-primary-btn"
-                          onClick={() => handleHealthReportSubmit(dogGroup.dog._id)}
-                        >
-                          Submit Health Report
-                        </button>
-                      </div>
+                      <button 
+                        className="v-dash-primary-btn"
+                        onClick={() => openHealthReportModal(dogGroup.dog)}
+                      >
+                        Submit Health Report
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1470,7 +2352,6 @@ const VolunteerDashboard = () => {
                   <div className="v-dash-health-header">
                     <Heart size={24} />
                     <h3>General Health Report</h3>
-                    {/* <span className="status-indicator">No assigned tasks</span> */}
                   </div>
 
                   <div className="v-dash-health-form">
@@ -1565,7 +2446,7 @@ const VolunteerDashboard = () => {
                           accept="image/*" 
                           multiple
                           style={{ display: 'none' }}
-                          onChange={(e) => setHealthReport({...healthReport, photos: Array.from(e.target.files)})}
+                          onChange={(e) => setHealthReport({...healthReport, photos: Array.from(e.target.files || [])})}
                         />
                         
                         {Array.isArray(healthReport.photos) && healthReport.photos.length > 0 && (
@@ -1605,8 +2486,6 @@ const VolunteerDashboard = () => {
                   </div>
                 </div>
               )}
-
-              {/* Recent Health Reports section removed as requested */}
             </section>
           )}
           
@@ -1904,18 +2783,67 @@ const VolunteerDashboard = () => {
                       <p><Calendar size={16} /> {new Date(event.date).toLocaleDateString()}</p>
                       <p><Clock size={16} /> {new Date(event.date).toLocaleTimeString()}</p>
                       <p><MapPin size={16} /> {event.location}</p>
-                      {/* <p>{event.description}</p> */}
+                     
                     </div>
                     
-                    <button 
-                      className={`v-dash-event-rsvp-btn ${event.attendees?.includes(userData?.id) ? 'cancel' : 'confirm'}`}
-                      onClick={() => toggleEventRSVP(event._id)}
-                    >
-                      {event.attendees?.includes(userData?.id) ? 'Cancel RSVP' : 'RSVP Now'}
-                    </button>
+                    <div className="v-dash-event-actions">
+                     
+                      
+                      <button 
+                        className="v-dash-calendar-btn"
+                        onClick={() => {
+                          // Add event to calendar and navigate
+                          const calendarEvent = {
+                            id: event._id,
+                            title: event.title,
+                            date: event.date,
+                            location: event.location,
+                            type: event.eventType || 'shelter',
+                            description: event.description || ''
+                          };
+                          
+                          try {
+                            // Get existing calendar events
+                            const existingEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+                            
+                            // Check if event is already in calendar
+                            const isAlreadyAdded = existingEvents.some(e => e.id === event._id);
+                            
+                            if (!isAlreadyAdded) {
+                              // Add new event to calendar
+                              const updatedEvents = [...existingEvents, calendarEvent];
+                              localStorage.setItem('calendarEvents', JSON.stringify(updatedEvents));
+                            }
+                            
+                            // Navigate to calendar
+                            window.location.href = '/eventcalendar';
+                            
+                          } catch (error) {
+                            console.error('Error adding event to calendar:', error);
+                            alert('Added to calendar! Navigating...');
+                            window.location.href = '/eventcalendar';
+                          }
+                        }}
+                      >
+                        <CalendarDays size={16} />
+                        Add to Calendar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
+              
+              {events.length === 0 && (
+                <div className="v-dash-no-events">
+                  <p>No upcoming events found.</p>
+                  <button 
+                    className="v-dash-primary-btn"
+                    onClick={() => window.location.href = '/events'}
+                  >
+                    Browse All Events
+                  </button>
+                </div>
+              )}
               
               <div className="v-dash-past-events">
                 <h3>Past Events</h3>
@@ -1943,7 +2871,10 @@ const VolunteerDashboard = () => {
               
               <button 
                 className="v-dash-primary-btn new-post-btn"
-                onClick={() => setShowNewPostForm(!showNewPostForm)}
+                onClick={() => {
+                  setShowNewPostForm(!showNewPostForm);
+                  setNewBlogPost({ title: '', content: '' }); // Reset form when opening
+                }}
               >
                 <Plus size={18} />
                 <span>{showNewPostForm ? 'Cancel' : 'New Blog Post'}</span>
@@ -1975,7 +2906,10 @@ const VolunteerDashboard = () => {
                   <div className="v-dash-form-actions">
                     <button 
                       className="v-dash-secondary-btn"
-                      onClick={() => setShowNewPostForm(false)}
+                      onClick={() => {
+                        setShowNewPostForm(false);
+                        setNewBlogPost({ title: '', content: '' });
+                      }}
                     >
                       Cancel
                     </button>
@@ -2001,11 +2935,13 @@ const VolunteerDashboard = () => {
                       <div className="v-dash-post-info">
                         <h4>{post.title}</h4>
                         <p>Submitted on {new Date(post.createdAt).toLocaleDateString()}</p>
-                        <p className="v-dash-post-excerpt">{post.content.substring(0, 150)}...</p>
+                        <p className="v-dash-post-excerpt">
+                          {post.content?.substring(0, 150) || 'No content available'}...
+                        </p>
                       </div>
                       
-                      <div className={`v-dash-post-status ${post.status.toLowerCase()}`}>
-                        {post.status}
+                      <div className={`v-dash-post-status ${(post.status || 'draft').toLowerCase()}`}>
+                        {post.status || 'Draft'}
                       </div>
                       
                       <div className="v-dash-post-actions">
@@ -2015,19 +2951,21 @@ const VolunteerDashboard = () => {
                           disabled={post.status === 'published'}
                           title={post.status === 'published' ? 'Published posts cannot be edited' : 'Edit post'}
                         >
+                          <Edit3 size={14} />
                           Edit
                         </button>
                         <button 
                           className="v-dash-delete-btn"
                           onClick={() => handleDeleteBlogPost(post._id)}
-                          disabled={!['draft', 'pending', 'rejected'].includes(post.status)}
+                          disabled={post.status === 'published'}
                           title={
-                            ['draft', 'pending', 'rejected'].includes(post.status) 
-                              ? 'Delete post' 
-                              : `Cannot delete ${post.status} posts`
+                            post.status === 'published' 
+                              ? 'Published posts cannot be deleted' 
+                              : 'Delete post'
                           }
                         >
                           <Trash2 size={14} />
+                          Delete
                         </button>
                       </div>
                     </div>

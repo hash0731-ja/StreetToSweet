@@ -504,7 +504,7 @@ const [photoFile, setPhotoFile] = useState(null); // optional if you want to tra
                 <h3><Users size={24} /> Volunteer Dashboard</h3>
                 <button
                   className="user-profile-btn primary"
-                  onClick={() => navigate('/volunteerdashboard')}
+                  onClick={() => navigate('/volunteer/dashboard')}
                 >
                   Go to Volunteer Hub
                 </button>

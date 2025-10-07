@@ -1209,3 +1209,379 @@
   background-color: white;
   cursor: pointer;
 }
+
+/* Modal Styles */
+.v-dash-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.v-dash-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.v-dash-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.v-dash-modal-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.v-dash-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.v-dash-modal-close:hover {
+  background-color: #f1f5f9;
+  color: #374151;
+}
+
+.v-dash-modal-content {
+  padding: 24px;
+}
+
+.v-dash-modal-dog-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.v-dash-modal-dog-info img {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.v-dash-modal-dog-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.v-dash-modal-dog-info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.v-dash-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 24px;
+  border-top: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Blog Post Styles */
+.v-dash-blog-post {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.v-dash-post-info {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.v-dash-post-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 1.2rem;
+  color: #1f2937;
+}
+
+.v-dash-post-info p {
+  margin: 4px 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.v-dash-post-excerpt {
+  color: #6b7280 !important;
+  font-style: italic;
+  margin-top: 8px !important;
+}
+
+.v-dash-post-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin: 0 12px;
+}
+
+.v-dash-post-status.draft {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+.v-dash-post-status.pending {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.v-dash-post-status.published {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.v-dash-post-status.rejected {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.v-dash-post-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.v-dash-edit-btn, .v-dash-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.v-dash-edit-btn {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.v-dash-edit-btn:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.v-dash-edit-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.v-dash-delete-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.v-dash-delete-btn:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.v-dash-delete-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Events Styles */
+.v-dash-event-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.v-dash-calendar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background-color: #3b6aeb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.v-dash-calendar-btn:hover {
+  background-color: #3aa8ed;
+}
+
+.v-dash-event-description {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.v-dash-no-events {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.v-dash-no-events p {
+  margin-bottom: 16px;
+  color: #64748b;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .v-dash-modal {
+    margin: 20px;
+    max-height: calc(100vh - 40px);
+  }
+  
+  .v-dash-modal-actions {
+    flex-direction: column;
+  }
+  
+  .v-dash-modal-actions button {
+    width: 100%;
+  }
+
+  .v-dash-blog-post {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .v-dash-post-info {
+    margin-right: 0;
+    margin-bottom: 12px;
+  }
+  
+  .v-dash-post-status {
+    margin: 8px 0;
+    align-self: flex-start;
+  }
+  
+  .v-dash-event-actions {
+    flex-direction: column;
+  }
+  
+  .v-dash-post-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Existing dashboard styles remain the same */
+.v-dash-container {
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+.v-dash-header {
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.v-dash-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.v-dash-brand h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.v-dash-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+/* Add to VolunteerDashboard.css */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.new-assignment {
+  animation: slideIn 0.5s ease-out;
+}
+
+.refresh-button:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+/* Add any other existing styles you have for the dashboard */

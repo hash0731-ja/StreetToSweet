@@ -14,9 +14,6 @@ import {
   ChevronRight,
   CircleQuestionMark,
   House,
-  Syringe,
-  Award,
-  MoveRightIcon,
 } from "lucide-react";
 
 import Footer from "../Footer/Footer";
@@ -341,14 +338,8 @@ const [selectedDog, setSelectedDog] = useState(null);
 
         {/* LOST & FOUND */}
         <section className="lost-found">
-          {/* Paw Steps Layer */}
-          <div className="paw-layer">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <span key={i} className="paw">
-                🔎
-              </span>
-            ))}
-          </div>
+          
+          
 
           {/* Main Content */}
           <div className="lost-found-container">

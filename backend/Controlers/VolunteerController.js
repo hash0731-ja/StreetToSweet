@@ -1,135 +1,388 @@
 const Volunteer = require("../Model/VolunteerModel");
+const Dog = require("../Model/DogModel");
+const VolunteerTask = require("../Model/VolunteerTaskModel");
+const User = require("../Model/Register");
 
-// 1. Get all volunteers
+// Get all volunteers for admin dashboard
 const getAllVolunteers = async (req, res) => {
   try {
-    const volunteers = await Volunteer.find();
-    if (!volunteers || volunteers.length === 0) {
-      return res.status(404).json({ message: "No volunteers found" });
-    }
-    return res.status(200).json({ volunteers });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Server error", error: err.message });
-  }
-};
+    const { page = 1, limit = 50, status, search } = req.query;
+    const query = {};
 
-// 2. Add new volunteer
-const addVolunteer = async (req, res) => {
-  const { name, email, phone, availability, task, motivation } = req.body;
-  
-  // Validate required fields
-  if (!name || !email || !phone) {
-    return res.status(400).json({ 
-      message: "Missing required fields", 
-      error: "Name, email, and phone are required" 
-    });
-  }
-
-  try {
-    // Check if volunteer with this email already exists
-    const existingVolunteer = await Volunteer.findOne({ email });
-    if (existingVolunteer) {
-      return res.status(409).json({ 
-        message: "Volunteer already exists", 
-        error: "A volunteer with this email is already registered" 
-      });
+    if (status && status !== 'all') query.status = status;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    const volunteer = await Volunteer.create({ 
-      name, 
-      email, 
-      phone, 
-      availability, 
-      task, 
-      motivation 
+    const volunteers = await Volunteer.find(query)
+      .populate('userId', 'name email phone')
+      .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
+      .populate('assignedTasks.taskId')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    // Transform the data for frontend
+    const transformedVolunteers = volunteers.map(volunteer => ({
+      id: volunteer._id,
+      _id: volunteer._id,
+      name: volunteer.name,
+      email: volunteer.email,
+      phone: volunteer.phone || 'Not provided',
+      availability: volunteer.availability,
+      status: volunteer.status,
+      assignedDogs: volunteer.assignedDogs || [],
+      assignedTasks: volunteer.assignedTasks || [],
+      completedTasks: volunteer.completedTasks || 0,
+      totalHours: volunteer.totalHours || 0,
+      joinDate: volunteer.createdAt ? volunteer.createdAt.toISOString().split('T')[0] : '',
+      userId: volunteer.userId
+    }));
+
+    const total = await Volunteer.countDocuments(query);
+
+    res.json({
+      status: 'success',
+      data: transformedVolunteers
     });
-    
-    return res.status(201).json({ 
-      message: "Volunteer registered successfully",
-      volunteer 
-    });
-  } catch (err) {
-    console.error("Error creating volunteer:", err);
-    
-    // Handle validation errors
-    if (err.name === 'ValidationError') {
-      const validationErrors = Object.values(err.errors).map(error => error.message);
-      return res.status(400).json({ 
-        message: "Validation failed", 
-        error: validationErrors.join(', ')
-      });
-    }
-    
-    // Handle duplicate key errors
-    if (err.code === 11000) {
-      return res.status(409).json({ 
-        message: "Duplicate entry", 
-        error: "A volunteer with this information already exists" 
-      });
-    }
-    
-    return res.status(500).json({ 
-      message: "Server error", 
-      error: "Unable to register volunteer. Please try again later." 
+  } catch (error) {
+    console.error('Get volunteers error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get volunteers',
+      error: error.message
     });
   }
 };
 
-// 3. Get volunteer by ID
-const getVolunteerById = async (req, res) => {
-  const id = req.params.id;
+// Get available dogs for volunteer assignment
+const getAvailableDogs = async (req, res) => {
   try {
-    const volunteer = await Volunteer.findById(id);
+    const dogs = await Dog.find({
+      status: { $in: ['treatment', 'adoption'] }
+    }).select('name breed age healthStatus status photo');
+
+    res.json({
+      status: 'success',
+      data: {
+        dogs: dogs.map(dog => ({
+          _id: dog._id,
+          id: dog._id,
+          name: dog.name,
+          breed: dog.breed || 'Mixed',
+          age: dog.age || 'Unknown',
+          healthStatus: dog.healthStatus || 'good',
+          status: dog.status,
+          photo: dog.photo
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Get available dogs error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get available dogs',
+      error: error.message
+    });
+  }
+};
+
+// Assign dogs to volunteer
+const assignDogsToVolunteer = async (req, res) => {
+  try {
+    const { volunteerId } = req.params;
+    const { dogIds } = req.body;
+
+    if (!Array.isArray(dogIds) || dogIds.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide an array of dog IDs'
+      });
+    }
+
+    const volunteer = await Volunteer.findById(volunteerId);
     if (!volunteer) {
-      return res.status(404).json({ message: "Volunteer not found" });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
     }
-    return res.status(200).json({ volunteer });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Server error", error: err.message });
+
+    // Check if dogs exist
+    const dogs = await Dog.find({ _id: { $in: dogIds } });
+    if (dogs.length !== dogIds.length) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Some dogs not found'
+      });
+    }
+
+    // Add dogs to volunteer's assigned dogs (avoid duplicates)
+    const existingDogIds = new Set(volunteer.assignedDogs.map(ad => ad.dogId.toString()));
+    const newAssignments = dogIds
+      .filter(dogId => !existingDogIds.has(dogId.toString()))
+      .map(dogId => ({
+        dogId: dogId,
+        assignedDate: new Date(),
+        assignmentStatus: 'active'
+      }));
+
+    volunteer.assignedDogs = [...volunteer.assignedDogs, ...newAssignments];
+    await volunteer.save();
+
+    // Populate and return updated volunteer
+    const updatedVolunteer = await Volunteer.findById(volunteerId)
+      .populate('assignedDogs.dogId', 'name breed age healthStatus status photo');
+
+    res.json({
+      status: 'success',
+      message: 'Dogs assigned successfully',
+      data: { volunteer: updatedVolunteer }
+    });
+  } catch (error) {
+    console.error('Assign dogs error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to assign dogs',
+      error: error.message
+    });
   }
 };
 
-// 4. Update volunteer
-const updateVolunteer = async (req, res) => {
-  const id = req.params.id;
-  const { name, email, phone, availability, task, motivation } = req.body;
+// Assign task to volunteer
+const assignTaskToVolunteer = async (req, res) => {
   try {
+    const { volunteerId } = req.params;
+    const { 
+      dogId, 
+      taskType, 
+      taskDescription, 
+      scheduledTime, 
+      priority = 'medium', 
+      estimatedDuration = 30 
+    } = req.body;
+
+    const volunteer = await Volunteer.findById(volunteerId);
+    if (!volunteer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
+    }
+
+    // Validate dog exists if provided
+    if (dogId) {
+      const dog = await Dog.findById(dogId);
+      if (!dog) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Dog not found'
+        });
+      }
+    }
+
+    // Create task
+    const task = await VolunteerTask.create({
+      volunteerId,
+      dogId: dogId || null,
+      taskType,
+      taskDescription,
+      scheduledTime: new Date(scheduledTime),
+      priority,
+      estimatedDuration,
+      status: 'pending'
+    });
+
+    // Add task to volunteer's assigned tasks
+    volunteer.assignedTasks = volunteer.assignedTasks || [];
+    volunteer.assignedTasks.push({
+      taskId: task._id,
+      assignedAt: new Date()
+    });
+    
+    await volunteer.save();
+
+    // Populate task for response
+    if (dogId) {
+      await task.populate('dogId', 'name breed photo status');
+    }
+    await task.populate('volunteerId', 'name email');
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Task assigned successfully',
+      data: {
+        task
+      }
+    });
+  } catch (error) {
+    console.error('Assign task error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to assign task',
+      error: error.message
+    });
+  }
+};
+
+// Update volunteer status
+const updateVolunteerStatus = async (req, res) => {
+  try {
+    const { volunteerId } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['pending', 'active', 'inactive', 'suspended'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid status'
+      });
+    }
+
     const volunteer = await Volunteer.findByIdAndUpdate(
-      id,
-      { name, email, phone, availability, task, motivation },
-      { new: true, runValidators: true }
-    );
+      volunteerId,
+      { status },
+      { new: true }
+    )
+    .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
+    .populate('userId', 'name email phone');
+
     if (!volunteer) {
-      return res.status(404).json({ message: "Unable to update volunteer details" });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
     }
-    return res.status(200).json({ volunteer });
-  } catch (err) {
-    console.error(err);
-    return res.status(400).json({ message: "Update failed", error: err.message });
+
+    res.json({
+      status: 'success',
+      message: `Volunteer status updated to ${status}`,
+      data: { volunteer }
+    });
+  } catch (error) {
+    console.error('Update volunteer status error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update volunteer status',
+      error: error.message
+    });
   }
 };
 
-// 5. Delete volunteer
-const deleteVolunteer = async (req, res) => {
-  const id = req.params.id;
+// Update volunteer information
+const updateVolunteer = async (req, res) => {
   try {
-    const volunteer = await Volunteer.findByIdAndDelete(id);
+    const { volunteerId } = req.params;
+    const { name, email, phone, status, completedTasks } = req.body;
+
+    const volunteer = await Volunteer.findByIdAndUpdate(
+      volunteerId,
+      {
+        name,
+        email,
+        phone,
+        status,
+        completedTasks: parseInt(completedTasks) || 0
+      },
+      { new: true }
+    )
+    .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
+    .populate('userId', 'name email phone');
+
     if (!volunteer) {
-      return res.status(404).json({ message: "Volunteer not found" });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
     }
-    return res.status(200).json({ message: "Volunteer deleted successfully" });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Server error", error: err.message });
+
+    res.json({
+      status: 'success',
+      message: 'Volunteer updated successfully',
+      data: { volunteer }
+    });
+  } catch (error) {
+    console.error('Update volunteer error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update volunteer',
+      error: error.message
+    });
+  }
+};
+
+// Delete volunteer
+const deleteVolunteer = async (req, res) => {
+  try {
+    const { volunteerId } = req.params;
+
+    const volunteer = await Volunteer.findById(volunteerId);
+    if (!volunteer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
+    }
+
+    // Delete associated tasks
+    await VolunteerTask.deleteMany({ volunteerId: volunteerId });
+
+    // Update user role if exists
+    if (volunteer.userId) {
+      await User.findByIdAndUpdate(volunteer.userId, { role: 'user' });
+    }
+
+    await Volunteer.findByIdAndDelete(volunteerId);
+
+    res.json({
+      status: 'success',
+      message: 'Volunteer deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete volunteer error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete volunteer',
+      error: error.message
+    });
+  }
+};
+
+// Get volunteer tasks
+const getVolunteerTasks = async (req, res) => {
+  try {
+    const { volunteerId } = req.params;
+    
+    const tasks = await VolunteerTask.find({ volunteerId })
+      .populate('dogId', 'name breed photo healthStatus status')
+      .sort({ scheduledTime: 1 });
+
+    res.json({
+      status: 'success',
+      data: {
+        tasks
+      }
+    });
+  } catch (error) {
+    console.error('Get volunteer tasks error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get volunteer tasks',
+      error: error.message
+    });
   }
 };
 
 module.exports = {
   getAllVolunteers,
-  addVolunteer,
-  getVolunteerById,
+  getAvailableDogs,
+  assignDogsToVolunteer,
+  assignTaskToVolunteer,
+  updateVolunteerStatus,
   updateVolunteer,
   deleteVolunteer,
+  getVolunteerTasks
 };

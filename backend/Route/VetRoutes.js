@@ -20,6 +20,9 @@ const {
 } = require('../Controlers/VetController');
 const { authenticateToken, authorizeRoles, requireVet } = require('../middleware/auth');
 
+const AdoptionRequestController = require('../Controlers/AdoptionRequestControllers');
+
+
 // All vet routes require authentication; role checks are per-route
 router.use(authenticateToken);
 router.use(requireVet);
@@ -47,7 +50,9 @@ router.get('/dogs', authorizeRoles('vet','admin'), getAllDogs);
 
 // Backend: vetRoutes.js or dogController.js
 
-
+// All vet-related adoption routes
+router.get('/adoption-requests/pending', authenticateToken, authorizeRoles('vet', 'admin'), AdoptionRequestController.getPendingAdoptionRequests);
+router.post('/adoption-requests/:id/review', authenticateToken, authorizeRoles('vet', 'admin'), AdoptionRequestController.vetReviewAdoptionRequest);
 
 
 // Route: POST /vet/dogs/:id/certify

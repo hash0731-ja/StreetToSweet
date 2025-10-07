@@ -270,11 +270,7 @@ if (!adoptionRequest || !dog) {
           <input type="file" multiple onChange={handlePhotos} />
         </label>
 
-        <label>
-          Upload Vet Report:
-          <input type="file" onChange={handleVetReport} />
-        </label>
-
+       
         <button type="submit" className="submit-btn" disabled={summary.completed >= 4 || isSubmitting}>
           {summary.completed >= 4 ? 'All Weeks Completed' : (isSubmitting ? 'Submitting...' : 'Submit Follow-Up Report')}
         </button>

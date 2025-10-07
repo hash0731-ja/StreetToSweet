@@ -40,7 +40,7 @@ router.get("/", DogController.getAllDogs);          // GET all dogs
 router.post("/", DogController.addDog);            // POST add dog (without image)
 router.post("/with-image", uploadDogImage.single('photo'), DogController.addDogWithImage); // POST add dog with image
 router.get("/:id", DogController.getDogById);      // GET dog by ID
-router.put("/:id", DogController.updateDog);       // PUT update dog
+router.put("/:id", uploadDogImage.single('photo'), DogController.updateDog);
 router.delete("/:id", DogController.deleteDog);    // DELETE dog
 
 // --- NEW ROUTES: Waiting List (Under Treatment) ---

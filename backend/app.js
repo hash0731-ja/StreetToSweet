@@ -3,6 +3,8 @@
 //setup express and mongoose
 const express = require('express');
 const mongoose = require('mongoose');
+
+
 // Allow populating non-schema paths in legacy code without throwing
 mongoose.set('strictPopulate', false);
 const cors = require('cors');
@@ -27,12 +29,20 @@ const dashboardRouter = require("./Route/DashboardRoutes");
 const donationRouter = require('./Route/DonationRoutes');
 const contactMessageRouter = require('./Route/ContactMessageRoutes');
 
+const vetAdoptionRoutes = require('./Route/vetAdoptionRoutes');
+
+
 // Import new authentication and dashboard routes
 const authRouter = require('./Route/AuthRoutes');
 const adminRouter = require('./Route/AdminRoutes');
 const driverRouter = require('./Route/DriverRoutes');
 const vetRouter = require('./Route/VetRoutes');
 const volunteerDashboardRouter = require('./Route/VolunteerDashboardRoutes');
+
+
+
+
+
 
 app.use(express.json());
 app.use(cors());
@@ -64,8 +74,31 @@ app.use("/driver", driverRouter);
 app.use("/vet", vetRouter);
 app.use("/volunteer/dashboard", volunteerDashboardRouter);
 
+
+app.use('/vet/adoption-requests', vetAdoptionRoutes);
+
+
+// In your main app file
+app.use('/uploads/dogs', express.static(path.join(__dirname, 'uploads/dogs')));
+
+
+// Error handling for file uploads
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        message: 'File too large',
+        error: 'File size should be less than 5MB'
+      });
+    }
+  }
+  next(error);
+});
+
+
+
 // connect MongoDB
-mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://msideshan_db_user:qk088celCdDDGPoB@cluster0.vpimf9w.mongodb.net/streetToSweetDB?retryWrites=true&w=majority")
+mongoose.connect("mongodb+srv://admin:SuMMrCw0ZzZpREUN@cluster0.910rlkg.mongodb.net/streetToSweetDB?retryWrites=true&w=majority")
     .then(() => console.log("Connected to MongoDB"))
     .catch((err) => console.log(err));
 

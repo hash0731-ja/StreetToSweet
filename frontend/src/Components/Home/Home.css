@@ -1379,3 +1379,12 @@ margin-top: -40px;
   gap: 20px;
   margin-top: 20px;
 }
+.qr-container-i {
+  text-align: center;
+}
+
+.qr-container-i img {
+  width: 200px;
+  height: 200px;
+  display: inline-block; /* or keep as inline element */
+}

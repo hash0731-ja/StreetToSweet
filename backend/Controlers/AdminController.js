@@ -9,7 +9,7 @@ require('../Model/LostFoundModel');
 require('../Model/EventModel');
 
 const User = mongoose.model("Register");
-const Dog = mongoose.model("DogModel"); // Fixed: Use correct model name
+const Dog = mongoose.model("DogModel");
 const AdoptionRequest = mongoose.model("AdoptionRequest");
 const Volunteer = mongoose.model("Volunteer");
 const LostFound = mongoose.model("LostFound");
@@ -27,7 +27,15 @@ const getAdminDashboard = async (req, res) => {
         console.log('[AdminDashboard] step=counts:users:done', userCount);
 
         console.log('[AdminDashboard] step=counts:dogs:start');
-        const dogCount = await Dog.countDocuments();
+        const allDogs = await Dog.find();
+        const dogCount = allDogs.length;
+        
+        // Calculate dog status counts
+        const adoptedDogsCount = allDogs.filter(dog => dog.status === 'adopted').length;
+        const treatmentDogsCount = allDogs.filter(dog => dog.status === 'treatment').length;
+        const adoptionReadyCount = allDogs.filter(dog => dog.status === 'adoption').length;
+        const rescueDogsCount = allDogs.filter(dog => dog.status === 'rescue').length;
+        
         console.log('[AdminDashboard] step=counts:dogs:done', dogCount);
 
         console.log('[AdminDashboard] step=counts:adoptionRequests:start');
@@ -53,8 +61,19 @@ const getAdminDashboard = async (req, res) => {
         ]);
         console.log('[AdminDashboard] step=roleStats:done');
 
-        // Get recent activities (skip heavy queries to avoid legacy populate issues)
-        const recentAdoptions = [];
+        // Get recent activities
+        const recentAdoptions = await AdoptionRequest.find()
+            .populate('dog', 'name')
+            .populate('user', 'name')
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .then(requests => requests.map(req => ({
+                id: req._id,
+                type: 'adoption',
+                message: `Adoption ${req.requestStatus} for ${req.dog?.name || 'Unknown Dog'}`,
+                time: req.createdAt,
+                user: req.user?.name || 'Unknown User'
+            })));
 
         // Get pending requests
         console.log('[AdminDashboard] step=adoptionStats:start');
@@ -80,7 +99,13 @@ const getAdminDashboard = async (req, res) => {
                     totalAdoptionRequests: adoptionRequestCount,
                     totalVolunteers: volunteerCount,
                     totalLostFound: lostFoundCount,
-                    upcomingEvents: eventCount
+                    upcomingEvents: eventCount,
+                    // Add detailed dog counts
+                    adoptedDogs: adoptedDogsCount,
+                    dogsInShelter: treatmentDogsCount + adoptionReadyCount + rescueDogsCount,
+                    dogsInTreatment: treatmentDogsCount,
+                    dogsForAdoption: adoptionReadyCount,
+                    activeRescues: rescueDogsCount
                 },
                 roleStats,
                 adoptionStats: {
@@ -131,7 +156,7 @@ const getAllUsers = async (req, res) => {
             data: {
                 users,
                 pagination: {
-                    current: page,
+                    current: parseInt(page),
                     pages: Math.ceil(total / limit),
                     total
                 }
@@ -161,7 +186,7 @@ const updateUserStatus = async (req, res) => {
 
         if (!user) {
             return res.status(404).json({
-                error: 'User not found',
+                status: 'error',
                 message: 'User not found'
             });
         }
@@ -190,14 +215,14 @@ const deleteUser = async (req, res) => {
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({
-                error: 'User not found',
+                status: 'error',
                 message: 'User not found'
             });
         }
 
         if (user.role === 'admin') {
             return res.status(403).json({
-                error: 'Cannot delete admin',
+                status: 'error',
                 message: 'Admin users cannot be deleted'
             });
         }
@@ -227,7 +252,7 @@ const promoteUser = async (req, res) => {
         const validRoles = ['user', 'driver', 'vet', 'volunteer'];
         if (!validRoles.includes(newRole)) {
             return res.status(400).json({
-                error: 'Invalid role',
+                status: 'error',
                 message: 'Invalid role specified'
             });
         }
@@ -240,7 +265,7 @@ const promoteUser = async (req, res) => {
 
         if (!user) {
             return res.status(404).json({
-                error: 'User not found',
+                status: 'error',
                 message: 'User not found'
             });
         }
@@ -259,7 +284,7 @@ const promoteUser = async (req, res) => {
         });
     }
 };
- 
+
 // Get available drivers for assignment
 const getAvailableDrivers = async (req, res) => {
     try {
@@ -283,7 +308,7 @@ const getAvailableDrivers = async (req, res) => {
                     address: driver.address,
                     licenseNumber: driver.licenseNumber,
                     availability: driver.availability || [],
-                    available: true // For now, assume all active drivers are available
+                    available: true
                 }))
             }
         });
@@ -297,24 +322,34 @@ const getAvailableDrivers = async (req, res) => {
     }
 };
 
-module.exports = {
-    getAdminDashboard,
-    getAllUsers,
-    updateUserStatus,
-    deleteUser,
-    promoteUser,
-    getAvailableDrivers,
-    // The following functions are appended below
-};
-
-// ---------------- Additional Admin Management Endpoints ----------------
-
 // Create a user (admin action) with a temporary password
 const createUser = async (req, res) => {
     try {
         const { name, email, role = 'user', isActive = true } = req.body;
         if (!name || !email) {
-            return res.status(400).json({ status: 'error', message: 'Name and email are required' });
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Name and email are required' 
+            });
+        }
+
+        // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid email format'
+      });
+    }
+        
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'User with this email already exists'
+            });
         }
 
         // Generate a temporary password
@@ -323,18 +358,35 @@ const createUser = async (req, res) => {
         // Ensure role is valid
         const validRoles = ['user', 'admin', 'driver', 'vet', 'volunteer'];
         if (!validRoles.includes(role)) {
-            return res.status(400).json({ status: 'error', message: 'Invalid role' });
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Invalid role' 
+            });
         }
 
         // Create user
-        const user = new User({ name, email, password: tempPassword, role, isActive });
+        const user = new User({ 
+            name, 
+            email, 
+            password: tempPassword, 
+            role: role === 'adopter' ? 'user' : role, 
+            isActive 
+        });
         await user.save();
 
         const safeUser = await User.findById(user._id).select('-password');
-        res.status(201).json({ status: 'success', message: 'User created with temporary password', data: { user: safeUser } });
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'User created with temporary password', 
+            data: { user: safeUser } 
+        });
     } catch (error) {
         console.error('Create user error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to create user', error: error.message });
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Failed to create user', 
+            error: error.message 
+        });
     }
 };
 
@@ -344,7 +396,12 @@ const getAllEvents = async (req, res) => {
         const { page = 1, limit = 20, status, search } = req.query;
         const filter = {};
         if (status) filter.status = status;
-        if (search) filter.title = { $regex: search, $options: 'i' };
+        if (search) {
+            filter.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { location: { $regex: search, $options: 'i' } }
+            ];
+        }
 
         const events = await Event.find(filter)
             .populate('organizer', 'name email')
@@ -357,56 +414,128 @@ const getAllEvents = async (req, res) => {
             status: 'success',
             data: {
                 events,
-                pagination: { current: parseInt(page), pages: Math.ceil(total / limit), total }
+                pagination: { 
+                    current: parseInt(page), 
+                    pages: Math.ceil(total / limit), 
+                    total 
+                }
             }
         });
     } catch (error) {
         console.error('Get events error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to get events', error: error.message });
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Failed to get events', 
+            error: error.message 
+        });
     }
 };
 
 const createEvent = async (req, res) => {
     try {
-        const organizer = req.user._id; // admin user
+        const organizer = req.user._id;
         const {
-            title, description = 'N/A', date, startTime = '09:00', endTime = '17:00',
-            location, eventType = 'other', maxVolunteers = 10, requirements = '', tags = []
+            title, 
+            description = 'N/A', 
+            date, 
+            startTime = '09:00', 
+            endTime = '17:00',
+            location, 
+            eventType = 'other', 
+            maxVolunteers = 10, 
+            requirements = '', 
+            tags = []
         } = req.body;
 
         if (!title || !date || !location) {
-            return res.status(400).json({ status: 'error', message: 'Title, date and location are required' });
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Title, date and location are required' 
+            });
         }
 
         // If an image was uploaded via multer, save its served path under /uploads/events
         const photoPath = req.file ? `/uploads/events/${req.file.filename}` : undefined;
 
         const event = await Event.create({
-            title, description, date, startTime, endTime, location, eventType,
-            maxVolunteers, requirements, organizer, tags,
+            title, 
+            description, 
+            date, 
+            startTime, 
+            endTime, 
+            location, 
+            eventType,
+            maxVolunteers, 
+            requirements, 
+            organizer, 
+            tags,
             ...(photoPath ? { photos: [photoPath] } : {})
         });
 
-        const populated = await Event.findById(event._id).populate('organizer', 'name email');
-        res.status(201).json({ status: 'success', data: { event: populated } });
+        const populated = await Event.findById(event._id)
+            .populate('organizer', 'name email');
+            
+        res.status(201).json({ 
+            status: 'success', 
+            data: { event: populated } 
+        });
     } catch (error) {
         console.error('Create event error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to create event', error: error.message });
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Failed to create event', 
+            error: error.message 
+        });
     }
 };
 
 const updateEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const update = req.body;
+        const { title, date, location, attendees, status } = req.body;
 
-        const event = await Event.findByIdAndUpdate(eventId, update, { new: true })
-            .populate('organizer', 'name email');
-        if (!event) return res.status(404).json({ status: 'error', message: 'Event not found' });
-        res.json({ status: 'success', data: { event } });
+        // Find the event first
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ 
+                status: 'error', 
+                message: 'Event not found' 
+            });
+        }
+
+        // Prepare update data
+        const updateData = {
+            title: title || event.title,
+            date: date || event.date,
+            location: location || event.location,
+            status: status || event.status
+        };
+
+        // Handle file upload if provided
+        if (req.file) {
+            const photoPath = `/uploads/events/${req.file.filename}`;
+            updateData.photos = [photoPath];
+        }
+
+        // Update the event
+        const updatedEvent = await Event.findByIdAndUpdate(
+            eventId,
+            updateData,
+            { new: true, runValidators: true }
+        ).populate('organizer', 'name email');
+
+        res.json({
+            status: 'success',
+            message: 'Event updated successfully',
+            data: { event: updatedEvent }
+        });
     } catch (error) {
         console.error('Update event error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to update event', error: error.message });
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to update event',
+            error: error.message
+        });
     }
 };
 
@@ -414,17 +543,36 @@ const deleteEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
         const deleted = await Event.findByIdAndDelete(eventId);
-        if (!deleted) return res.status(404).json({ status: 'error', message: 'Event not found' });
-        res.json({ status: 'success', message: 'Event deleted' });
+        if (!deleted) {
+            return res.status(404).json({ 
+                status: 'error', 
+                message: 'Event not found' 
+            });
+        }
+        res.json({ 
+            status: 'success', 
+            message: 'Event deleted successfully' 
+        });
     } catch (error) {
         console.error('Delete event error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to delete event', error: error.message });
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Failed to delete event', 
+            error: error.message 
+        });
     }
 };
 
-// Export additional functions
-module.exports.createUser = createUser;
-module.exports.getAllEvents = getAllEvents;
-module.exports.createEvent = createEvent;
-module.exports.updateEvent = updateEvent;
-module.exports.deleteEvent = deleteEvent;
+module.exports = {
+    getAdminDashboard,
+    getAllUsers,
+    updateUserStatus,
+    deleteUser,
+    promoteUser,
+    getAvailableDrivers,
+    createUser,
+    getAllEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent
+};

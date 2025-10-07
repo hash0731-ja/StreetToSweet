@@ -1,3 +1,4 @@
+// VetDashboard.js
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -40,7 +41,7 @@ const VetDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000";
-const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [treatmentForm, setTreatmentForm] = useState({
     diagnosis: "",
     treatment: "",
@@ -76,88 +77,107 @@ const [loading, setLoading] = useState(true);
   };
 
   useEffect(() => {
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Get vet dashboard data
-      const dash = await axios.get(`${API_BASE}/vet/dashboard`, authHeader());
-      const v = dash.data?.data?.vetInfo || {};
-      setVet({
-        name: v.name || "Veterinarian",
-        specialization: v.specialization || "Canine Health",
-        experience: v.experience || "",
-      });
-
-      // Get dogs list
-      const res = await axios.get(`${API_BASE}/vet/dogs`, authHeader());
-      const list = res.data?.data?.dogs || [];
-      setDogs(
-        list.map((d) => ({
-          _id: d._id,
-          name: d.name,
-          status: normalizeStatus(d.healthStatus),
-          photo: d.photo ? `${API_BASE}/uploads/dogs/${d.photo}` : "https://placehold.co/300x300?text=Dog",
-          breed: d.breed || "",
-          age: d.age || "",
-          lastCheckup: d.updatedAt,
-          nextCheckup: d.nextCheckup,
-          healthCertified: d.healthCertified || false,
-          vaccinations: d.vaccinations || [],
-          medicalHistory: d.medicalHistory || [],
-        }))
-      );
-
-      // Fetch adoption requests pending vet approval
-      const adoptionRes = await axios.get(`${API_BASE}/vet/adoption-requests/pending`, authHeader());
-      
-      // Handle the response structure from your backend
-      const adoptionData = adoptionRes.data?.data?.requests || adoptionRes.data || [];
-      
-      // Enhance adoption data with dog information
-      const enhancedAdoptions = adoptionData.map(adoption => {
-        // If dog info is not populated, use the stored dog details
-        const dogInfo = adoption.dog || {
-          _id: adoption.dogId,
-          name: adoption.dogName,
-          breed: adoption.dogBreed,
-          photo: adoption.dogPhoto
-        };
+    const fetchData = async () => {
+      try {
+        setLoading(true);
         
-        return {
-          _id: adoption._id || adoption.id,
-          dog: {
-            _id: dogInfo._id,
-            name: dogInfo.name || "Unknown Dog",
-            breed: dogInfo.breed || "Unknown Breed",
-            age: dogInfo.age || "Unknown Age",
-            photo: dogInfo.photo ? `${API_BASE}/uploads/dogs/${dogInfo.photo}` : "https://placehold.co/300x300?text=Dog",
-            healthStatus: dogInfo.healthStatus || "unknown"
-          },
-          user: adoption.applicantUser || {
-            _id: adoption.userId,
-            name: adoption.fullName || "Unknown User",
-            email: adoption.email || "No email provided",
-            phone: adoption.phone || "No phone provided",
-            address: adoption.address || "No address provided"
-          },
-          status: adoption.requestStatus || "pending",
-          createdAt: adoption.createdAt || new Date().toISOString(),
-          notes: adoption.message || "",
-          vetApproved: adoption.vetReviewStatus === "approved"
-        };
-      });
+        // Get vet dashboard data
+        const dash = await axios.get(`${API_BASE}/vet/dashboard`, authHeader());
+        const v = dash.data?.data?.vetInfo || {};
+        setVet({
+          name: v.name || "Veterinarian",
+          specialization: v.specialization || "Canine Health",
+          experience: v.experience || "",
+        });
 
-      setAdoptionRequests(enhancedAdoptions);
-      
-    } catch (e) {
-      console.error("Vet dashboard fetch failed:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchData();
-}, []);
+        // Get dogs list
+        const res = await axios.get(`${API_BASE}/vet/dogs`, authHeader());
+        const list = res.data?.data?.dogs || [];
+        setDogs(
+          list.map((d) => ({
+            _id: d._id,
+            name: d.name,
+            status: normalizeStatus(d.healthStatus),
+            photo: d.photo ? `${API_BASE}/uploads/dogs/${d.photo}` : "https://placehold.co/300x300?text=Dog",
+            breed: d.breed || "",
+            age: d.age || "",
+            lastCheckup: d.updatedAt,
+            nextCheckup: d.nextCheckup,
+            healthCertified: d.healthCertified || false,
+            vaccinations: d.vaccinations || [],
+            medicalHistory: d.medicalHistory || [],
+          }))
+        );
+
+        // Fetch adoption requests pending vet approval
+        let adoptionData = [];
+        try {
+          // Try the vet-specific endpoint first
+          const adoptionRes = await axios.get(`${API_BASE}/adoption-requests/vet/pending`, authHeader());
+          adoptionData = adoptionRes.data?.requests || adoptionRes.data || [];
+        } catch (error) {
+          console.log("Vet pending endpoint failed, trying alternative...");
+          try {
+            // Try the main pending endpoint
+            const adoptionRes = await axios.get(`${API_BASE}/adoption-requests/pending`, authHeader());
+            adoptionData = adoptionRes.data || [];
+          } catch (secondError) {
+            console.log("Alternative endpoint failed, trying direct query...");
+            try {
+              // Try getting all requests and filtering
+              const allRes = await axios.get(`${API_BASE}/adoption-requests`, authHeader());
+              adoptionData = allRes.data.filter(req => 
+                req.vetReviewStatus === "pending" || 
+                (req.requestStatus === "pending" && (!req.vetReviewStatus || req.vetReviewStatus === "pending"))
+              );
+            } catch (thirdError) {
+              console.error("All adoption request endpoints failed:", thirdError);
+            }
+          }
+        }
+
+        console.log("Fetched adoption data:", adoptionData);
+        
+        // Enhance adoption data with dog information
+        const enhancedAdoptions = adoptionData.map(adoption => {
+          const dogInfo = adoption.dog || {};
+          
+          return {
+            _id: adoption._id,
+            dog: {
+              _id: dogInfo._id,
+              name: dogInfo.name || "Unknown Dog",
+              breed: dogInfo.breed || "Unknown Breed",
+              age: dogInfo.age || "Unknown Age",
+              photo: dogInfo.photo ? `${API_BASE}/uploads/dogs/${dogInfo.photo}` : "https://placehold.co/300x300?text=Dog",
+              healthStatus: dogInfo.healthStatus || "unknown"
+            },
+            user: adoption.applicantUser || {
+              _id: adoption.userId,
+              name: adoption.fullName || "Unknown User",
+              email: adoption.email || "No email provided",
+              phone: adoption.phone || "No phone provided",
+              address: adoption.address || "No address provided"
+            },
+            status: adoption.requestStatus || "pending",
+            vetReviewStatus: adoption.vetReviewStatus || "pending",
+            createdAt: adoption.createdAt || new Date().toISOString(),
+            notes: adoption.message || "",
+            vetApproved: adoption.vetReviewStatus === "approved"
+          };
+        });
+
+        console.log("Enhanced adoptions:", enhancedAdoptions);
+        setAdoptionRequests(enhancedAdoptions);
+        
+      } catch (e) {
+        console.error("Vet dashboard fetch failed:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const normalizeStatus = (healthStatus) => {
     switch (healthStatus) {
@@ -176,7 +196,62 @@ const [loading, setLoading] = useState(true);
 
   const handleLogout = () => {
     localStorage.removeItem("vetId");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("token");
     navigate("/");
+  };
+
+  // Filter for pending adoption requests
+  const pendingAdoptions = adoptionRequests.filter(req => 
+    req.vetReviewStatus === "pending" || req.status === "pending"
+  );
+
+  // Handle health certification for adoption requests - SINGLE FUNCTION
+  const handleCertifyHealthForAdoption = async (dogId, adoptionId, isHealthy) => {
+    try {
+      // Update dog health certification status
+      await axios.post(
+        `${API_BASE}/vet/dogs/${dogId}/certify`,
+        {
+          healthStatus: isHealthy ? "Healthy" : "Needs Attention",
+          approvalForAdoption: isHealthy,
+          notes: isHealthy ? "Cleared for adoption - healthy" : "Not fit for adoption - requires treatment"
+        },
+        authHeader()
+      );
+
+      // Update adoption request vet review status
+      await axios.post(
+        `${API_BASE}/adoption-requests/${adoptionId}/vet-review`,
+        {
+          status: isHealthy ? "approved" : "rejected",
+          note: isHealthy ? "Dog certified healthy for adoption" : "Dog requires medical attention"
+        },
+        authHeader()
+      );
+
+      // Update local state
+      setDogs(prev => 
+        prev.map(d => 
+          d._id === dogId 
+            ? { 
+                ...d, 
+                status: isHealthy ? "Healthy" : "Needs Attention",
+                healthCertified: isHealthy 
+              } 
+            : d
+        )
+      );
+
+      setAdoptionRequests(prev => 
+        prev.filter(req => req._id !== adoptionId)
+      );
+
+      alert(`Dog ${isHealthy ? "certified healthy" : "marked as needing attention"}!`);
+    } catch (e) {
+      console.error("Health certification failed", e);
+      alert("Failed to update health certification: " + (e.response?.data?.message || e.message));
+    }
   };
 
   // Existing vet functions
@@ -300,59 +375,6 @@ const [loading, setLoading] = useState(true);
     }
   };
 
-  // Add this function in VetDashboard.js
-const handleCertifyForAdoption = async (dogId, adoptionId, isApproved) => {
-  try {
-    // Update dog health certification status
-    await axios.post(
-      `${API_BASE}/vet/dogs/${dogId}/certify`,
-      {
-        healthStatus: isApproved ? "Healthy" : "Not Fit",
-        approvalForAdoption: isApproved,
-        notes: isApproved ? "Cleared for adoption" : "Not fit for adoption"
-      },
-      authHeader()
-    );
-
-    // Update adoption request status
-    await axios.post(
-      `${API_BASE}/vet/adoption-requests/${adoptionId}/${isApproved ? "approve" : "reject"}`,
-      {},
-      authHeader()
-    );
-
-    // Update local state
-    setDogs(prev => 
-      prev.map(d => 
-        d._id === dogId 
-          ? { 
-              ...d, 
-              status: isApproved ? "Healthy" : "Needs Attention",
-              healthCertified: isApproved 
-            } 
-          : d
-      )
-    );
-
-    setAdoptionRequests(prev => 
-      prev.map(req => 
-        req._id === adoptionId 
-          ? { 
-              ...req, 
-              status: isApproved ? "vet_approved" : "vet_rejected",
-              vetApproved: isApproved 
-            } 
-          : req
-      )
-    );
-
-    alert(`Adoption ${isApproved ? "approved" : "rejected"} successfully!`);
-  } catch (e) {
-    console.error("Certification failed", e);
-    alert("Failed to update certification status");
-  }
-};
-
   const handleDownloadReport = async (dog) => {
     try {
       const token = (localStorage.getItem('authToken') || localStorage.getItem('token')) || '';
@@ -391,60 +413,6 @@ const handleCertifyForAdoption = async (dogId, adoptionId, isApproved) => {
     setSelectedAdoption(adoption);
     setShowAdoptionDetails(true);
   };
-
-  const handleApproveAdoption = async (adoptionId) => {
-    try {
-      await axios.post(
-        `${API_BASE}/vet/adoption-requests/${adoptionId}/approve`,
-        {},
-        authHeader()
-      );
-      
-      // Update the adoption request status
-      setAdoptionRequests(prev => 
-        prev.map(req => 
-          req._id === adoptionId 
-            ? { ...req, status: "vet_approved", vetApproved: true } 
-            : req
-        )
-      );
-      
-      alert("Adoption approved successfully!");
-    } catch (e) {
-      console.error("Adoption approval failed", e);
-      alert("Failed to approve adoption");
-    }
-  };
-
-  const handleRejectAdoption = async (adoptionId) => {
-    try {
-      await axios.post(
-        `${API_BASE}/vet/adoption-requests/${adoptionId}/reject`,
-        {},
-        authHeader()
-      );
-      
-      // Update the adoption request status
-      setAdoptionRequests(prev => 
-        prev.map(req => 
-          req._id === adoptionId 
-            ? { ...req, status: "vet_rejected", vetApproved: false } 
-            : req
-        )
-      );
-      
-      alert("Adoption rejected successfully!");
-    } catch (e) {
-      console.error("Adoption rejection failed", e);
-      alert("Failed to reject adoption");
-    }
-  };
-
-  // Filter for pending adoption requests - UPDATED to match your backend status
-const pendingAdoptions = adoptionRequests.filter(req => 
-  req.status === "pending" || req.status === "pending_vet_approval"
-);
-
 
   return (
     <div className="vet-dashboard">
@@ -494,7 +462,7 @@ const pendingAdoptions = adoptionRequests.filter(req =>
         </button>
       </div>
 
-      {/* Dog Treatment Section (Existing Content) */}
+      {/* Dog Treatment Section */}
       {activeTab === "treatment" && (
         <div className="vet-dashboard-content">
           {/* Stats Overview */}
@@ -531,8 +499,8 @@ const pendingAdoptions = adoptionRequests.filter(req =>
                 <UserCheck size={24} />
               </div>
               <div className="vet-stat-info">
-                <h3>{dogs.filter(d => !d.healthCertified).length}</h3>
-                <p>Pending Certification</p>
+                <h3>{pendingAdoptions.length}</h3>
+                <p>Pending Adoptions</p>
               </div>
             </div>
           </div>
@@ -644,7 +612,7 @@ const pendingAdoptions = adoptionRequests.filter(req =>
         </div>
       )}
 
-      {/* Adoption Approvals Section (New Content) */}
+      {/* Adoption Approvals Section */}
       {activeTab === "adoptions" && (
         <div className="vet-dashboard-content">
           <div className="vet-content-section">
@@ -652,6 +620,7 @@ const pendingAdoptions = adoptionRequests.filter(req =>
               <h3>
                 <Heart size={24} />
                 Pending Adoption Approvals
+                <span className="vet-badge">{pendingAdoptions.length}</span>
               </h3>
               <div className="vet-search-filter">
                 <div className="vet-search-box">
@@ -679,18 +648,22 @@ const pendingAdoptions = adoptionRequests.filter(req =>
                     <div className="vet-adoption-header">
                       <div className="vet-adoption-dog">
                         <img 
-                          src={adoption.dog?.photo ? `http://localhost:3000/uploads/dogs/${adoption.dog.photo}` : "https://placehold.co/300x300?text=Dog"} 
+                          src={adoption.dog?.photo} 
                           alt={adoption.dog?.name} 
+                          onError={(e) => {
+                            e.target.src = "https://placehold.co/300x300?text=Dog";
+                          }}
                         />
                         <div className="vet-adoption-dog-info">
                           <h4>{adoption.dog?.name}</h4>
                           <p>{adoption.dog?.breed} • {adoption.dog?.age}</p>
+                          <span className={`health-status ${adoption.dog?.healthStatus?.toLowerCase()}`}>
+                            {adoption.dog?.healthStatus || "Health check needed"}
+                          </span>
                         </div>
                       </div>
                       <div className="vet-adoption-status">
-                        <span className={`status-badge ${adoption.status}`}>
-                          {adoption.status.replace('_', ' ')}
-                        </span>
+                        <span className="status-badge-pending">Pending Health Check</span>
                       </div>
                     </div>
                     
@@ -699,34 +672,45 @@ const pendingAdoptions = adoptionRequests.filter(req =>
                         <Users size={16} />
                         <span><strong>Adopter:</strong> {adoption.user?.name}</span>
                       </div>
+                      <div className="vet-adoption-contact">
+                        <span><strong>Email:</strong> {adoption.user?.email}</span>
+                        
+                      </div>
                       <div className="vet-adoption-date">
                         <Calendar size={16} />
                         <span><strong>Request Date:</strong> {formatDate(adoption.createdAt)}</span>
                       </div>
                     </div>
                     
-                   <div className="vet-adoption-actions">
-        <button 
-          className="vet-btn secondary"
-          onClick={() => handleViewAdoptionDetails(adoption)}
-        >
-          <Eye size={16} />
-          View Details
-        </button>
-        <button 
-          className="vet-btn success"
-          onClick={() => handleCertifyForAdoption(adoption.dog._id, adoption._id, true)}
-        >
-          <Check size={16} />
-          Approve & Certify
-        </button>
-        <button 
-          className="vet-btn danger"
-          onClick={() => handleCertifyForAdoption(adoption.dog._id, adoption._id, false)}
-        >
-          <XCircle size={16} />
-          Reject
-        </button>
+                    {adoption.notes && (
+                      <div className="vet-adoption-message">
+                        <strong>Adopter's Message:</strong>
+                        <p>{adoption.notes}</p>
+                      </div>
+                    )}
+                    
+                    <div className="vet-adoption-actions">
+                      <button 
+                        className="vet-btn secondary"
+                        onClick={() => handleViewAdoptionDetails(adoption)}
+                      >
+                        <Eye size={16} />
+                        View Details
+                      </button>
+                      <button 
+                        className="vet-btn success"
+                        onClick={() => handleCertifyHealthForAdoption(adoption.dog._id, adoption._id, true)}
+                      >
+                        <CheckCircle size={16} />
+                        Certify Healthy
+                      </button>
+                      <button 
+                        className="vet-btn warning"
+                        onClick={() => handleCertifyHealthForAdoption(adoption.dog._id, adoption._id, false)}
+                      >
+                        <AlertCircle size={16} />
+                        Needs Attention
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -749,8 +733,11 @@ const pendingAdoptions = adoptionRequests.filter(req =>
                 <h4>Dog Information</h4>
                 <div className="vet-adoption-dog-detail">
                   <img 
-                    src={selectedAdoption.dog?.photo ? `http://localhost:3000/uploads/dogs/${selectedAdoption.dog.photo}` : "https://placehold.co/300x300?text=Dog"} 
+                    src={selectedAdoption.dog?.photo} 
                     alt={selectedAdoption.dog?.name} 
+                    onError={(e) => {
+                      e.target.src = "https://placehold.co/300x300?text=Dog";
+                    }}
                   />
                   <div className="vet-adoption-dog-detail-info">
                     <p><strong>Name:</strong> {selectedAdoption.dog?.name}</p>
@@ -766,8 +753,7 @@ const pendingAdoptions = adoptionRequests.filter(req =>
                 <div className="vet-adoption-user-detail">
                   <p><strong>Name:</strong> {selectedAdoption.user?.name}</p>
                   <p><strong>Email:</strong> {selectedAdoption.user?.email}</p>
-                  <p><strong>Phone:</strong> {selectedAdoption.user?.phone || "Not provided"}</p>
-                  <p><strong>Address:</strong> {selectedAdoption.user?.address || "Not provided"}</p>
+                  
                 </div>
               </div>
               
@@ -775,9 +761,10 @@ const pendingAdoptions = adoptionRequests.filter(req =>
                 <h4>Adoption Details</h4>
                 <div className="vet-adoption-request-detail">
                   <p><strong>Request Date:</strong> {formatDate(selectedAdoption.createdAt)}</p>
-                  <p><strong>Status:</strong> {selectedAdoption.status.replace('_', ' ')}</p>
+                  <p><strong>Status:</strong> {selectedAdoption.status}</p>
+                  <p><strong>Vet Review Status:</strong> {selectedAdoption.vetReviewStatus}</p>
                   {selectedAdoption.notes && (
-                    <p><strong>Notes:</strong> {selectedAdoption.notes}</p>
+                    <p><strong>Adopter's Message:</strong> {selectedAdoption.notes}</p>
                   )}
                 </div>
               </div>
@@ -786,15 +773,15 @@ const pendingAdoptions = adoptionRequests.filter(req =>
               <button className="vet-btn" onClick={() => setShowAdoptionDetails(false)}>Close</button>
               <button 
                 className="vet-btn success"
-                onClick={() => handleApproveAdoption(selectedAdoption._id)}
+                onClick={() => handleCertifyHealthForAdoption(selectedAdoption.dog._id, selectedAdoption._id, true)}
               >
-                Approve Adoption
+                Certify Healthy
               </button>
               <button 
-                className="vet-btn danger"
-                onClick={() => handleRejectAdoption(selectedAdoption._id)}
+                className="vet-btn warning"
+                onClick={() => handleCertifyHealthForAdoption(selectedAdoption.dog._id, selectedAdoption._id, false)}
               >
-                Reject Adoption
+                Needs Attention
               </button>
             </div>
           </div>

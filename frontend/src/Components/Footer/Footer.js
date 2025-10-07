@@ -2,6 +2,7 @@ import React from "react";
 import "./Footer.css";
 import { FaFacebookF, FaInstagram, FaYoutube, FaTwitter, FaDonate } from "react-icons/fa";
 import { Clock, MapPin, Phone } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
@@ -23,14 +24,29 @@ const Footer = () => {
         <div className="footer-section links">
           <h3>Quick Links</h3>
           <ul>
-            <li>&gt; Home</li>
-            <li>&gt; Report Stray</li>
-            <li>&gt; Adoption</li>
-            <li>&gt; Events </li>
-            <li>&gt; Donate</li>
-            <li>&gt; Contact Us</li>
-            <li>&gt; About Us</li>
-          </ul>
+  <li>
+    &gt; <Link to="/" onClick={() => window.scrollTo(0, 0)}>Home</Link>
+  </li>
+  <li>
+    &gt; <Link to="/reportstray" onClick={() => window.scrollTo(0, 0)}>Report Stray</Link>
+  </li>
+  <li>
+    &gt; <Link to="/adoption" onClick={() => window.scrollTo(0, 0)}>Adoption</Link>
+  </li>
+  <li>
+    &gt; <Link to="/events" onClick={() => window.scrollTo(0, 0)}>Events</Link>
+  </li>
+  <li>
+    &gt; <Link to="/donate" onClick={() => window.scrollTo(0, 0)}>Donate</Link>
+  </li>
+  <li>
+    &gt; <Link to="/contactus" onClick={() => window.scrollTo(0, 0)}>Contact Us</Link>
+  </li>
+  <li>
+    &gt; <Link to="/aboutus" onClick={() => window.scrollTo(0, 0)}>About Us</Link>
+  </li>
+</ul>
+
         </div>
 
         {/* Contact Info */}

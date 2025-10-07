@@ -24,9 +24,8 @@ import feedImg from "../../assets/feed.jpg";
 import cleanImg from "../../assets/clean.jpg";
 import rescueImg from "../../assets/rescue.jpg";
 
-import dog1 from "../../assets/dog1.jpg";
-import dog2 from "../../assets/dog2.jpg";
-import dog4 from "../../assets/dog4.jpg";
+import qr from "../../assets/qr.jpg";
+
 
 import bg1 from "../../assets/bg1.jpg";
 import bg2 from "../../assets/bg2.jpg";
@@ -528,10 +527,10 @@ const Home = () => {
       </button>
 
       {/* QR Code → navigate to DonationPay.js */}
-      <div className="qr-container">
+      <div className="qr-container-i">
         <p>Scan to Donate ❤</p>
         <img
-          src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://your-donation-link.com"
+          src={qr}
           alt="QR Code"
           style={{ cursor: "pointer" }}
            onClick={() => {

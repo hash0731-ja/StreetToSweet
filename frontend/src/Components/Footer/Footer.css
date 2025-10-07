@@ -162,3 +162,12 @@
     grid-template-columns: 1fr;
   }
 }
+.footer-section.links ul li a {
+  color: #ffffff;          /* white text */
+  text-decoration: none;   /* remove underline */
+  transition: color 0.3s ease;
+}
+
+.footer-section.links ul li a:hover {
+  color: #2563eb;          /* blue on hover */
+}

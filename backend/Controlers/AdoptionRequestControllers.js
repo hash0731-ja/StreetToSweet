@@ -57,6 +57,11 @@ const createAdoptionRequest = async (req, res) => {
       homeType,
       hasPets: !!hasPets,
       agree: !!agree,
+
+
+      // AUTO-SET VET REVIEW STATUS TO PENDING
+      vetReviewStatus: "pending",
+      requestStatus: "pending"
     };
 
     // Link applicant user if available
@@ -66,6 +71,7 @@ const createAdoptionRequest = async (req, res) => {
 
     const newRequest = new AdoptionRequest(payload);
     const savedRequest = await newRequest.save();
+    
     const populated = await savedRequest.populate('dog');
     res.status(201).json(populated);
   } catch (error) {
@@ -123,21 +129,39 @@ const updateAdoptionRequest = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const allowedOwnerFields = ['fullName','email','phone','address','message','status','homeType','hasPets','agree'];
+    // For admin users, allow updating all fields including requestStatus
     const update = {};
-    Object.entries(req.body || {}).forEach(([k,v])=>{
-      if (isAdmin) {
-        update[k] = v; // admin can update any field; status changes handled separately in approve/reject
-      } else if (allowedOwnerFields.includes(k)) {
+    if (isAdmin) {
+      // Admin can update any field
+      Object.entries(req.body || {}).forEach(([k, v]) => {
         update[k] = v;
-      }
-    });
+      });
+    } else {
+      // Regular users can only update their own information fields
+      const allowedOwnerFields = ['fullName','email','phone','address','message','status','homeType','hasPets','agree'];
+      Object.entries(req.body || {}).forEach(([k, v]) => {
+        if (allowedOwnerFields.includes(k)) {
+          update[k] = v;
+        }
+      });
+    }
 
-    const updated = await AdoptionRequest.findByIdAndUpdate(id, update, { new: true, runValidators: true }).populate('dog');
+    console.log('Updating adoption request with data:', update);
+
+    const updated = await AdoptionRequest.findByIdAndUpdate(
+      id, 
+      update, 
+      { new: true, runValidators: true }
+    ).populate('dog').populate('applicantUser', 'name email');
+
     res.status(200).json(updated);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error updating adoption request", error: error.message });
+    console.error('Update adoption request error:', error);
+    res.status(500).json({ 
+      message: "Error updating adoption request", 
+      error: error.message,
+      details: error.errors ? Object.keys(error.errors) : null
+    });
   }
 };
 
@@ -358,40 +382,68 @@ const getAdoptionCertificateData = async (req, res) => {
 // Get all pending adoption requests (for vet/admin)
 const getPendingAdoptionRequests = async (req, res) => {
   try {
-    const requests = await AdoptionRequest.find({ requestStatus: "pending" })
-      .populate("dog")
+    const requests = await AdoptionRequest.find({ 
+      $or: [
+        { vetReviewStatus: "pending" },
+        { requestStatus: "pending", vetReviewStatus: { $exists: false } }
+      ]
+    })
+      .populate("dog", "name breed age photo healthStatus")
       .populate("applicantUser", "name email");
-    res.status(200).json({ data: requests });
+    res.status(200).json(requests);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error fetching pending adoption requests", error: error.message });
   }
 };
 
-// Send adoption request to vet for review
-const sendToVetReview = async (req, res) => {
+const vetReviewAdoptionRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const note = req.body?.note || '';
+    const { status, note } = req.body;
     
-    const updated = await AdoptionRequest.findByIdAndUpdate(
+    // Validate input
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ 
+        message: 'Status must be either "approved" or "rejected"' 
+      });
+    }
+
+    // Find the adoption request
+    const adoptionRequest = await AdoptionRequest.findById(id);
+    if (!adoptionRequest) {
+      return res.status(404).json({ message: 'Adoption request not found' });
+    }
+
+    // Update vet review status
+    const updatedRequest = await AdoptionRequest.findByIdAndUpdate(
       id,
       { 
-        requestStatus: 'pending_vet_approval',
-        vetReviewStatus: 'pending',
-        vetReviewNote: note
+        vetReviewStatus: status,
+        vetReviewNote: note,
+        vetReviewedBy: req.user._id,
+        vetReviewedAt: new Date()
       },
-      { new: true }
-    ).populate('dog').populate('applicantUser', 'name email');
-    
-    if (!updated) return res.status(404).json({ message: 'Adoption request not found' });
-    
-    res.json(updated);
+      { new: true, runValidators: true }
+    )
+    .populate('dog', 'name breed age photo healthStatus vaccinated')
+    .populate('applicantUser', 'name email phone')
+    .populate('vetReviewedBy', 'name specialization');
+
+    res.json({
+      message: `Adoption request ${status} by vet`,
+      request: updatedRequest
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error sending to vet review', error: error.message });
+    console.error('Vet review error:', error);
+    res.status(500).json({ 
+      message: 'Error updating vet review status', 
+      error: error.message 
+    });
   }
 };
+
+
 
 module.exports = {
   createAdoptionRequest,
@@ -399,12 +451,12 @@ module.exports = {
   getMyAdoptionRequests,
   getPendingAdoptionRequests,
   getRequestsByDog,
-  sendToVetReview,
   updateAdoptionRequest,
   approveAdoptionRequest,
   rejectAdoptionRequest,
   deleteAdoptionRequest,
   getAdoptionRequestById,
   getAdoptionCertificateData,
-  
+  vetReviewAdoptionRequest,
+
 };

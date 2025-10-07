@@ -1629,3 +1629,480 @@ button.my-ad-btn:hover {
   outline: none;
   box-shadow: 0 0 10px rgba(255, 100, 120, 0.7);
 }
+/* Follow-Up Reports Auto Display */
+.followup-progress-summary {
+  background: linear-gradient(135deg, #223795 0%, #5c72ba 100%);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 2rem;
+}
+
+.progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.progress-stat {
+  text-align: center;
+}
+
+.stat-number {
+  display: block;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.followup-progress-summary .stat-label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  color: #ffffff;
+}
+
+.auto-reports-section {
+  margin: 2rem 0;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.report-card-auto {
+  background: rgb(251, 248, 234);
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0e0e0;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.report-card-auto:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.report-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.dog-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dog-photo-report {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.dog-details h4 {
+  margin: 0 0 4px 0;
+  color: #333;
+}
+
+.dog-id {
+  font-size: 0.8rem;
+  color: #828282;
+  margin: 0;
+}
+
+.week-badge {
+  background: #4CAF50;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.report-date {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+
+
+.report-summary-auto {
+  margin: 1rem 0;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.summary-item label {
+  font-weight: 600;
+  color: #555;
+}
+
+.health-status.healthy { color: #4CAF50; font-weight: 600; }
+.health-status.needs attention { color: #FF9800; font-weight: 600; }
+.health-status.critical { color: #F44336; font-weight: 600; }
+
+.report-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.photo-indicator, .vet-indicator {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.no-reports {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: white;
+  border-radius: 10px;
+  border: 2px dashed #ddd;
+}
+
+.no-reports-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.followup-quick-actions {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 10px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.loading-reports {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+.followup-instructions p{
+  text-align: center;
+}
+
+/* Report Detail Modal Styles */
+.report-detail-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 0;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.report-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e1e5e9;
+  background: linear-gradient(135deg, #91a2eb 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.report-modal-title h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: white;
+}
+
+.report-week {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Report Navigation */
+.report-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.nav-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.report-counter {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* Dog Information Section */
+.report-dog-info {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.dog-photo-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 3px solid #e5e7eb;
+}
+
+.dog-details-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.5rem;
+  color: #1f2937;
+}
+
+.dog-details-section p {
+  margin: 4px 0;
+  color: #6b7280;
+}
+
+.dog-details-section strong {
+  color: #374151;
+}
+
+/* Report Details Grid */
+.report-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+
+.report-detail-card {
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.report-detail-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.report-detail-card h4 {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+/* Health Status Badges */
+.health-status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.health-status-badge.excellent {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.health-status-badge.good {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.health-status-badge.fair {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.health-status-badge.poor {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Behavior Tags */
+.behavior-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.behavior-tag {
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Detail Notes */
+.detail-notes {
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #667eea;
+  margin-top: 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Media Indicators */
+.media-indicators {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.media-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.media-indicator.photo {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.media-indicator.vet {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+/* Modal Actions */
+.report-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 20px 24px;
+  border-top: 1px solid #e1e5e9;
+  background: #f8f9fa;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .report-detail-modal {
+    width: 95%;
+    margin: 20px;
+  }
+
+  .report-dog-info {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .report-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .report-modal-actions {
+    flex-direction: column;
+  }
+}
+
+/* Loading State */
+.loading-reports {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+/* No Reports State */
+.no-reports {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.no-reports-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.no-reports h4 {
+  color: #374151;
+  margin-bottom: 12px;
+}

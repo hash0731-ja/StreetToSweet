@@ -61,15 +61,53 @@ const getDogById = async (req, res) => {
   }
 };
 
-// 4. Update dog
+// 4. Update dog - FIXED to handle both JSON and FormData
 const updateDog = async (req, res) => {
   try {
-    const dog = await Dog.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if (!dog) return res.status(404).json({ message: "Dog not found" });
-    res.status(200).json(dog);
+    const { id } = req.params;
+    let updates = { ...req.body };
+    
+    // Parse badges if it's a string (from FormData)
+    if (updates.badges && typeof updates.badges === 'string') {
+      try {
+        updates.badges = JSON.parse(updates.badges);
+      } catch (e) {
+        // If parsing fails, keep as is
+        console.log('Badges parse error:', e);
+      }
+    }
+    
+    // Handle file upload if photo is provided
+    if (req.file) {
+      updates.photo = req.file.filename;
+    }
+    
+    // Find and update the dog
+    const dog = await Dog.findByIdAndUpdate(id, updates, { 
+      new: true, 
+      runValidators: true 
+    });
+    
+    if (!dog) {
+      return res.status(404).json({ 
+        message: "Dog not found",
+        success: false 
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: "Dog updated successfully",
+      data: dog
+    });
+    
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ message: "Update failed", error: err.message });
+    console.error('Update dog error:', err);
+    res.status(400).json({ 
+      message: "Update failed", 
+      error: err.message,
+      success: false
+    });
   }
 };
 

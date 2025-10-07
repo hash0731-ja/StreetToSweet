@@ -4,7 +4,7 @@ const volunteerTaskSchema = new mongoose.Schema(
   {
     volunteerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Register",
+      ref: "Volunteer",
       required: true
     },
     dogId: {
@@ -14,7 +14,7 @@ const volunteerTaskSchema = new mongoose.Schema(
     },
     taskType: {
       type: String,
-      enum: ["feeding", "walking", "grooming", "medication", "training", "cleaning", "socialization"],
+      enum: ["feeding", "walking", "grooming", "medication", "training", "cleaning", "socialization", "health_check"],
       required: true
     },
     taskDescription: {
@@ -42,11 +42,11 @@ const volunteerTaskSchema = new mongoose.Schema(
       default: "medium"
     },
     estimatedDuration: {
-      type: Number, // in minutes
+      type: Number,
       default: 30
     },
     actualDuration: {
-      type: Number // in minutes
+      type: Number
     }
   },
   { timestamps: true }

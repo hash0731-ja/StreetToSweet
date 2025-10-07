@@ -117,7 +117,7 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
   font-size: 1.2rem;
   font-weight: 700;
   color: #fff;
-  background: rgba(58, 79, 65, 0.7);
+  background: rgba(52, 72, 59, 0.7);
   display: inline-block;
   padding: 12px 25px;
   border-radius: 30px;
@@ -441,8 +441,8 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
 }
 
 /* Event Types Color */
-.event-type.adoption { background: linear-gradient(135deg,#f093fb,#f5576c);}
-.event-type.vaccination { background: linear-gradient(135deg,#36d1dc,#5b86e5);}
+.event-type.adoption { background: linear-gradient(135deg,#ed99f7,#f77485);}
+.event-type.vaccination { background: linear-gradient(135deg,#5fedf8,#6c96ef);}
 .event-type.fundraising { background: linear-gradient(135deg,#fbc2eb,#a6c1ee);}
 
 /* Info */
@@ -497,7 +497,7 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
 
 /* Register Now Button */
 .event-buttons button:first-child {
-  background: linear-gradient(105.7deg, rgb(6, 154, 117), rgba(49, 100, 255, 1));
+  background: linear-gradient(105.7deg, rgb(35, 145, 117), rgba(49, 100, 255, 1));
   color: #fff;
   box-shadow: 0 4px 15px rgba(6, 154, 117, 0.4);
   animation: pulseGlow 2s infinite; /* ✅ Live glowing effect */
@@ -558,8 +558,6 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
     width: 90%;
   }
 }
-
-
 
 /* Past Events Section */
 .past-events {
@@ -900,8 +898,6 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
   }
 }
 
-
-
 /* Involvement Section */
 .involved-section {
   text-align: center;
@@ -1023,7 +1019,7 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
   justify-content: center;
   align-items: center;
   gap: 0.3rem;
-  background-color: #0a5757;
+  background-color: #0f7272;
   color: #fff;
   padding: 0.4rem 0.8rem;
   border-radius: 5px;

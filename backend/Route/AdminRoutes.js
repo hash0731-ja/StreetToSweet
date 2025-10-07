@@ -16,8 +16,19 @@ const {
     deleteEvent,
     getAvailableDrivers
 } = require('../Controlers/AdminController');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
+// Import volunteer controllers
+const {
+    getAllVolunteers,
+    getAvailableDogs,
+    assignDogsToVolunteer,
+    assignTaskToVolunteer,
+    updateVolunteerStatus,
+    deleteVolunteer,
+    getVolunteerTasks
+} = require('../Controlers/VolunteerController'); // Make sure this path is correct
+
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 // Configure multer for event image uploads
 const eventImageStorage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -61,7 +72,16 @@ router.put('/users/:userId/promote', promoteUser);
 router.get('/events', getAllEvents);
 // Accept optional image upload with field name 'photo'
 router.post('/events', uploadEventImage.single('photo'), createEvent);
-router.put('/events/:eventId', updateEvent);
+router.put('/events/:eventId', authenticateToken, uploadEventImage.single('photo'), updateEvent);
 router.delete('/events/:eventId', deleteEvent);
+
+// Volunteer Management Routes
+router.get('/volunteers', getAllVolunteers);
+router.get('/volunteers/available/dogs', getAvailableDogs);
+router.post('/volunteers/:volunteerId/assign-dogs', assignDogsToVolunteer);
+router.post('/volunteers/:volunteerId/tasks', assignTaskToVolunteer);
+router.put('/volunteers/:volunteerId/status', updateVolunteerStatus);
+router.delete('/volunteers/:volunteerId', deleteVolunteer);
+router.get('/volunteers/:volunteerId/tasks', getVolunteerTasks);
 
 module.exports = router;

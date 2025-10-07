@@ -100,6 +100,9 @@ router.post("/", async (req, res) => {
   }
 });
 
+
+
+
 // --- AUTHENTICATED VOLUNTEER REGISTRATION (for logged-in users) ---
 router.post("/register-authenticated", authenticateToken, async (req, res) => {
   const { availability, task, motivation } = req.body;
@@ -130,7 +133,8 @@ router.post("/register-authenticated", authenticateToken, async (req, res) => {
       phone: user.phone || "Not provided", 
       availability, 
       task, 
-      motivation 
+      motivation,
+       userId: user.id
     });
 
     // Update user role to 'volunteer'

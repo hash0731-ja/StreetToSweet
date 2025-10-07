@@ -11,16 +11,87 @@ function Login({ setIsLoggedIn }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({
+    email: "",
+    password: ""
+  });
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  // Email validation function
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return "Email is required";
+    if (!emailRegex.test(email)) return "Please enter a valid email address";
+    if (email.length > 254) return "Email address is too long";
+    return "";
+  };
+
+  // Password validation function
+  const validatePassword = (password) => {
+    if (!password) return "Password is required";
+    if (password.length < 6) return "Password must be at least 6 characters long";
+    if (password.length > 128) return "Password is too long";
+    return "";
+  };
+
+  // Real-time field validation
+  const validateField = (name, value) => {
+    switch (name) {
+      case "email":
+        return validateEmail(value);
+      case "password":
+        return validatePassword(value);
+      default:
+        return "";
+    }
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(""); // Clear error when user types
+    const { name, value } = e.target;
+    
+    // Update form data
+    setFormData({ ...formData, [name]: value });
+    
+    // Clear general error
+    setError("");
+    
+    // Validate field in real-time and update field errors
+    const fieldError = validateField(name, value);
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: fieldError
+    }));
+  };
+
+  // Form validation before submission
+  const validateForm = () => {
+    const errors = {
+      email: validateEmail(formData.email),
+      password: validatePassword(formData.password)
+    };
+
+    setFieldErrors(errors);
+
+    // Check if any errors exist
+    return !errors.email && !errors.password;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form before submission
+    if (!validateForm()) {
+      setError("Please fix the validation errors above.");
+      return;
+    }
+
+    // Additional security checks
+    if (formData.email.trim() !== formData.email) {
+      setError("Email should not contain leading or trailing spaces");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -45,6 +116,9 @@ function Login({ setIsLoggedIn }) {
       setLoading(false);
     }
   };
+
+  // Check if form is valid for submission
+  const isFormValid = !fieldErrors.email && !fieldErrors.password && formData.email && formData.password;
 
   return (
     <div
@@ -82,7 +156,11 @@ function Login({ setIsLoggedIn }) {
               onChange={handleChange}
               required
               disabled={loading}
+              className={fieldErrors.email ? "error" : ""}
             />
+            {fieldErrors.email && (
+              <span className="field-error">{fieldErrors.email}</span>
+            )}
           </div>
           <div className="input-group password-group">
             <label>Password</label>
@@ -94,6 +172,7 @@ function Login({ setIsLoggedIn }) {
                 onChange={handleChange}
                 required
                 disabled={loading}
+                className={fieldErrors.password ? "error" : ""}
               />
               <span
                 className="toggle-password"
@@ -104,8 +183,15 @@ function Login({ setIsLoggedIn }) {
                 {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
               </span>
             </div>
+            {fieldErrors.password && (
+              <span className="field-error">{fieldErrors.password}</span>
+            )}
           </div>
-          <button type="submit" className="submit-btn" disabled={loading}>
+          <button 
+            type="submit" 
+            className="submit-btn" 
+            disabled={loading || !isFormValid}
+          >
             {loading ? "Signing In..." : "Log In"}
           </button>
           {/* ✅ Emergency Report Button */}
@@ -120,7 +206,7 @@ function Login({ setIsLoggedIn }) {
         </form>
         <div className="signup-link">
           <p>
-            Don’t have an account? <Link to="/register">Sign up here</Link>
+            Don't have an account? <Link to="/register">Sign up here</Link>
           </p>
         </div>
         <div className="social-icons">

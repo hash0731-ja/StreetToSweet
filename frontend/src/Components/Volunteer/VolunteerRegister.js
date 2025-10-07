@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import Nav from "../Nav/Nav";
 import Footer from "../Footer/Footer";
 import "./VolunteerRegister.css";
 import volunteerImg from "../../assets/volunteer-dog.jpg";
@@ -24,6 +23,14 @@ function VolunteerRegister() {
   const [loading, setLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    availability: "",
+    task: "",
+    motivation: "",
+  });
 
   // Pre-populate form with user data if logged in
   useEffect(() => {
@@ -37,12 +44,130 @@ function VolunteerRegister() {
     }
   }, [user, isAuthenticated]);
 
+  // Name validation function
+  const validateName = (name) => {
+    if (!name) return "Full name is required";
+    if (name.length < 2) return "Name must be at least 2 characters long";
+    if (name.length > 50) return "Name is too long (max 50 characters)";
+    if (!/^[a-zA-Z\s]+$/.test(name)) return "Name can only contain letters and spaces";
+    return "";
+  };
+
+  // Email validation function
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return "Email is required";
+    if (!emailRegex.test(email)) return "Please enter a valid email address";
+    if (email.length > 254) return "Email address is too long";
+    return "";
+  };
+
+  // Phone validation function
+  const validatePhone = (phone) => {
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phone) return "Phone number is required";
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!phoneRegex.test(cleanPhone)) return "Please enter a valid 10-digit phone number";
+    return "";
+  };
+
+  // Availability validation function
+  const validateAvailability = (availability) => {
+    if (!availability) return "Availability is required";
+    if (availability.length < 5) return "Please provide more specific availability";
+    if (availability.length > 100) return "Availability description is too long";
+    return "";
+  };
+
+  // Task validation function
+  const validateTask = (task) => {
+    if (!task) return "Please select a preferred task";
+    const validTasks = ["Dog Walking", "Cleaning", "Feeding", "Rescue", "Post-care Involvement", "Other"];
+    if (!validTasks.includes(task)) return "Please select a valid task";
+    return "";
+  };
+
+  // Motivation validation function
+  const validateMotivation = (motivation) => {
+    if (!motivation) return "Motivation is required";
+    
+    return "";
+  };
+
+  // Real-time field validation
+  const validateField = (name, value) => {
+    switch (name) {
+      case "name":
+        return validateName(value);
+      case "email":
+        return validateEmail(value);
+      case "phone":
+        return validatePhone(value);
+      case "availability":
+        return validateAvailability(value);
+      case "task":
+        return validateTask(value);
+      case "motivation":
+        return validateMotivation(value);
+      default:
+        return "";
+    }
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Update form data
+    setFormData({ ...formData, [name]: value });
+    
+    // Clear general message
+    setMessage("");
+    
+    // Validate field in real-time and update field errors
+    const fieldError = validateField(name, value);
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: fieldError
+    }));
+  };
+
+  // Form validation before submission
+  const validateForm = () => {
+    const errors = {
+      name: isAuthenticated && user ? "" : validateName(formData.name),
+      email: isAuthenticated && user ? "" : validateEmail(formData.email),
+      phone: (isAuthenticated && user && user.phone) ? "" : validatePhone(formData.phone),
+      availability: validateAvailability(formData.availability),
+      task: validateTask(formData.task),
+      motivation: validateMotivation(formData.motivation)
+    };
+
+    setFieldErrors(errors);
+
+    // Check if any errors exist
+    return !Object.values(errors).some(error => error !== "");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form before submission
+    if (!validateForm()) {
+      setMessage("Please fix the validation errors above.");
+      return;
+    }
+
+    // Additional security checks
+    if (formData.email && formData.email.trim() !== formData.email) {
+      setMessage("Email should not contain leading or trailing spaces");
+      return;
+    }
+
+    if (formData.name && formData.name.trim() !== formData.name) {
+      setMessage("Name should not contain leading or trailing spaces");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
     setRegistrationSuccess(false);
@@ -55,9 +180,19 @@ function VolunteerRegister() {
       if (isAuthenticated && user) {
         url = "http://localhost:3000/volunteers/register-authenticated";
         requestBody = {
-          availability: formData.availability,
+          availability: formData.availability.trim(),
           task: formData.task,
-          motivation: formData.motivation
+          motivation: formData.motivation.trim()
+        };
+      } else {
+        // For guest registration, clean the data
+        requestBody = {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.replace(/\D/g, ''),
+          availability: formData.availability.trim(),
+          task: formData.task,
+          motivation: formData.motivation.trim()
         };
       }
 
@@ -124,6 +259,16 @@ function VolunteerRegister() {
           }));
         }
 
+        // Clear field errors on success
+        setFieldErrors({
+          name: "",
+          email: "",
+          phone: "",
+          availability: "",
+          task: "",
+          motivation: "",
+        });
+
         // Scroll to top smoothly
         window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -151,6 +296,11 @@ function VolunteerRegister() {
       navigate("/volunteerdashboard");
     }
   };
+
+  // Check if form is valid for submission
+  const isFormValid = !Object.values(fieldErrors).some(error => error !== "") && 
+                     formData.availability && formData.task && formData.motivation &&
+                     (isAuthenticated || (formData.name && formData.email && formData.phone));
 
   return (
     <div className="volunteer-register">
@@ -202,8 +352,11 @@ function VolunteerRegister() {
               required
               disabled={loading || (isAuthenticated && user)}
               placeholder="Enter your full name"
-              className={isAuthenticated && user ? "readonly-field" : ""}
+              className={`${isAuthenticated && user ? "readonly-field" : ""} ${fieldErrors.name ? "error-field" : ""}`}
             />
+            {fieldErrors.name && (
+              <span className="field-error">{fieldErrors.name}</span>
+            )}
 
             <label>Email</label>
             <input
@@ -214,8 +367,11 @@ function VolunteerRegister() {
               required
               disabled={loading || (isAuthenticated && user)}
               placeholder="Enter your email address"
-              className={isAuthenticated && user ? "readonly-field" : ""}
+              className={`${isAuthenticated && user ? "readonly-field" : ""} ${fieldErrors.email ? "error-field" : ""}`}
             />
+            {fieldErrors.email && (
+              <span className="field-error">{fieldErrors.email}</span>
+            )}
 
             <label>Phone Number</label>
             <input
@@ -225,9 +381,12 @@ function VolunteerRegister() {
               onChange={handleChange}
               required
               disabled={loading || (isAuthenticated && user && user.phone)}
-              placeholder="Enter your phone number"
-              className={isAuthenticated && user && user.phone ? "readonly-field" : ""}
+              placeholder="Enter your 10-digit phone number"
+              className={`${isAuthenticated && user && user.phone ? "readonly-field" : ""} ${fieldErrors.phone ? "error-field" : ""}`}
             />
+            {fieldErrors.phone && (
+              <span className="field-error">{fieldErrors.phone}</span>
+            )}
 
             <label>Availability *</label>
             <input
@@ -238,7 +397,11 @@ function VolunteerRegister() {
               required
               disabled={loading}
               placeholder="e.g., Weekends, Evenings, Monday-Friday"
+              className={fieldErrors.availability ? "error-field" : ""}
             />
+            {fieldErrors.availability && (
+              <span className="field-error">{fieldErrors.availability}</span>
+            )}
 
             <label>Preferred Task *</label>
             <select
@@ -247,6 +410,7 @@ function VolunteerRegister() {
               onChange={handleChange}
               required
               disabled={loading}
+              className={fieldErrors.task ? "error-field" : ""}
             >
               <option value="">-- Select Task --</option>
               <option value="Dog Walking">🐕 Dog Walking</option>
@@ -256,6 +420,9 @@ function VolunteerRegister() {
               <option value="Post-care Involvement">❤️ Post-care Involvement</option>
               <option value="Other">🔧 Other</option>
             </select>
+            {fieldErrors.task && (
+              <span className="field-error">{fieldErrors.task}</span>
+            )}
 
             <label>Motivation *</label>
             <textarea
@@ -265,9 +432,13 @@ function VolunteerRegister() {
               required
               disabled={loading}
               placeholder="Tell us why you want to volunteer and help street dogs..."
+              className={fieldErrors.motivation ? "error-field" : ""}
             ></textarea>
+            {fieldErrors.motivation && (
+              <span className="field-error">{fieldErrors.motivation}</span>
+            )}
 
-            <button type="submit" className="volunteer-btn" disabled={loading}>
+            <button type="submit" className="volunteer-btn" disabled={loading || !isFormValid}>
               {loading ? "Registering..." : "Register as Volunteer"}
             </button>
           </form>
