@@ -10,6 +10,7 @@ const {
     deleteUser, 
     promoteUser,
     createUser,
+    updateUser,
     getAllEvents,
     createEvent,
     updateEvent,
@@ -64,6 +65,7 @@ router.get('/dashboard', getAdminDashboard);
 router.get('/users', getAllUsers);
 router.get('/drivers', getAvailableDrivers);
 router.post('/users', createUser);
+router.put('/users/:userId', updateUser);
 router.put('/users/:userId/status', updateUserStatus);
 router.delete('/users/:userId', deleteUser);
 router.put('/users/:userId/promote', promoteUser);

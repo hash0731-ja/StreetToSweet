@@ -10,7 +10,8 @@ const volunteerTaskSchema = new mongoose.Schema(
     dogId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "DogModel",
-      required: true
+      required: false,
+      default: null
     },
     taskType: {
       type: String,

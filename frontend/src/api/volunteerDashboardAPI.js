@@ -235,53 +235,47 @@ class VolunteerDashboardAPI {
     }
 
 
-// Get assigned dogs for the logged-in volunteer
-getAssignedDogs = async () => {
-  try {
-    const response = await axios.get('/volunteer/dashboard/assigned-dogs', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching assigned dogs:', error);
-    throw error;
-  }
-};
-
-// Get volunteer tasks
-getVolunteerTasks = async (volunteerId) => {
-  try {
-    const response = await axios.get(`/volunteer/dashboard/tasks`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching volunteer tasks:', error);
-    throw error;
-  }
-};
-
-// Update task status
-updateTaskStatus = async (taskId, status) => {
-  try {
-    const response = await axios.put(`/volunteer/dashboard/tasks/${taskId}/status`, 
-      { status },
-      {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+    // Get assigned dogs for the logged-in volunteer
+    async getAssignedDogs() {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/volunteer/dashboard/assigned-dogs`, {
+                headers: this.getHeaders()
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching assigned dogs:', error);
+            throw error;
         }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error updating task status:', error);
-    throw error;
-  }
-};
+    }
+
+    // Get volunteer tasks (for logged-in volunteer)
+    async getVolunteerTasks() {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/volunteer/dashboard/tasks`, {
+                headers: this.getHeaders()
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching volunteer tasks:', error);
+            throw error;
+        }
+    }
+
+    // Update task status
+    async updateTaskStatus(taskId, status) {
+        try {
+            const response = await axios.put(`${API_BASE_URL}/volunteer/dashboard/tasks/${taskId}/status`, 
+                { status },
+                {
+                    headers: this.getHeaders()
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error updating task status:', error);
+            throw error;
+        }
+    }
 
 
 

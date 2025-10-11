@@ -390,6 +390,86 @@ const createUser = async (req, res) => {
     }
 };
 
+// Update a user (admin action)
+const updateUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { name, email, role, isActive } = req.body;
+
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'Invalid user ID' 
+            });
+        }
+
+        // Find the user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ 
+                status: 'error', 
+                message: 'User not found' 
+            });
+        }
+
+        // Validate email format if provided
+        if (email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Invalid email format'
+                });
+            }
+
+            // Check if email is taken by another user
+            if (email !== user.email) {
+                const existingUser = await User.findOne({ email });
+                if (existingUser) {
+                    return res.status(400).json({
+                        status: 'error',
+                        message: 'Email already in use by another user'
+                    });
+                }
+            }
+        }
+
+        // Validate role if provided
+        if (role) {
+            const validRoles = ['user', 'admin', 'driver', 'vet', 'volunteer'];
+            if (!validRoles.includes(role)) {
+                return res.status(400).json({ 
+                    status: 'error', 
+                    message: 'Invalid role' 
+                });
+            }
+        }
+
+        // Update user fields
+        if (name !== undefined) user.name = name;
+        if (email !== undefined) user.email = email;
+        if (role !== undefined) user.role = role === 'adopter' ? 'user' : role;
+        if (isActive !== undefined) user.isActive = isActive;
+
+        await user.save();
+
+        const safeUser = await User.findById(user._id).select('-password');
+        res.json({ 
+            status: 'success', 
+            message: 'User updated successfully', 
+            data: { user: safeUser } 
+        });
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Failed to update user', 
+            error: error.message 
+        });
+    }
+};
+
 // Events CRUD for admin
 const getAllEvents = async (req, res) => {
     try {
@@ -571,6 +651,7 @@ module.exports = {
     promoteUser,
     getAvailableDrivers,
     createUser,
+    updateUser,
     getAllEvents,
     createEvent,
     updateEvent,

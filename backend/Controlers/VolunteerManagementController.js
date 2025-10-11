@@ -6,12 +6,25 @@ const User = require("../Model/Register");
 // Get assigned dogs for logged-in volunteer
 const getAssignedDogs = async (req, res) => {
   try {
-    const volunteerId = req.user._id;
+    const userId = req.user._id;
 
-    // Find volunteer by user ID
-    const volunteer = await Volunteer.findOne({ userId: volunteerId })
+    // Prefer lookup by userId; gracefully fallback to email if not linked yet
+    let volunteer = await Volunteer.findOne({ userId: userId })
       .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
       .populate('assignedTasks.taskId');
+
+    if (!volunteer) {
+      // Fallback: find by email (older records may not have userId set)
+      volunteer = await Volunteer.findOne({ email: req.user.email })
+        .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
+        .populate('assignedTasks.taskId');
+
+      // If found via email but missing userId, link it now for future requests
+      if (volunteer && !volunteer.userId) {
+        volunteer.userId = userId;
+        await volunteer.save();
+      }
+    }
 
     if (!volunteer) {
       return res.status(404).json({
@@ -21,9 +34,9 @@ const getAssignedDogs = async (req, res) => {
     }
 
     // Transform the data for frontend
-    const assignedDogs = volunteer.assignedDogs.map(assignment => ({
+    const assignedDogs = (volunteer.assignedDogs || []).map(assignment => ({
       assignmentId: assignment._id,
-      dogId: assignment.dogId,
+      dogId: assignment.dogId, // populated dog document (name, breed, age, healthStatus, status, photo)
       assignedDate: assignment.assignedDate,
       assignmentStatus: assignment.assignmentStatus
     }));
@@ -45,11 +58,18 @@ const getAssignedDogs = async (req, res) => {
 // Get tasks for logged-in volunteer
 const getVolunteerTasks = async (req, res) => {
   try {
-    const volunteerId = req.user._id;
+    const userId = req.user._id;
 
-    // Find volunteer by user ID first
-    const volunteer = await Volunteer.findOne({ userId: volunteerId });
-    
+    // Find volunteer by user ID first; fallback to email and auto-link if needed
+    let volunteer = await Volunteer.findOne({ userId: userId });
+    if (!volunteer) {
+      volunteer = await Volunteer.findOne({ email: req.user.email });
+      if (volunteer && !volunteer.userId) {
+        volunteer.userId = userId;
+        await volunteer.save();
+      }
+    }
+
     if (!volunteer) {
       return res.status(404).json({
         status: 'error',
@@ -58,9 +78,15 @@ const getVolunteerTasks = async (req, res) => {
     }
 
     // Get tasks using volunteer ID (from Volunteer collection)
-    const tasks = await VolunteerTask.find({ volunteerId: volunteer._id })
+    const tasksRaw = await VolunteerTask.find({ volunteerId: volunteer._id })
       .populate('dogId', 'name breed photo healthStatus status')
       .sort({ scheduledTime: 1 });
+
+    const tasks = tasksRaw.map(t => ({
+      ...t.toObject(),
+      // Map db enum in_progress -> UI friendly in-progress
+      status: t.status === 'in_progress' ? 'in-progress' : t.status
+    }));
 
     res.json({
       status: 'success',
@@ -80,11 +106,21 @@ const getVolunteerTasks = async (req, res) => {
 const updateTaskStatus = async (req, res) => {
   try {
     const { taskId } = req.params;
-    const { status } = req.body;
-    const volunteerId = req.user._id;
+    let { status } = req.body;
+    const volunteerAuthUserId = req.user._id;
+
+    // Map UI status to DB enum if needed
+    if (status === 'in-progress') status = 'in_progress';
 
     // Find volunteer first
-    const volunteer = await Volunteer.findOne({ userId: volunteerId });
+    let volunteer = await Volunteer.findOne({ userId: volunteerAuthUserId });
+    if (!volunteer && req.user?.email) {
+      volunteer = await Volunteer.findOne({ email: req.user.email });
+      if (volunteer && !volunteer.userId) {
+        volunteer.userId = volunteerAuthUserId;
+        await volunteer.save();
+      }
+    }
     
     if (!volunteer) {
       return res.status(404).json({
@@ -124,7 +160,12 @@ const updateTaskStatus = async (req, res) => {
     res.json({
       status: 'success',
       message: `Task status updated to ${status}`,
-      data: { task }
+      data: { 
+        task: {
+          ...task.toObject(),
+          status: task.status === 'in_progress' ? 'in-progress' : task.status
+        }
+      }
     });
   } catch (error) {
     console.error('Update task status error:', error);

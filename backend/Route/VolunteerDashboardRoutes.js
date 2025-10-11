@@ -72,13 +72,12 @@ router.use(requireVolunteer);
 // Dashboard Overview
 router.get('/overview', getVolunteerDashboard);
 
-// Tasks & Care Management
-router.get('/tasks', getAssignedTasks);
+// Tasks & Care Management (use volunteer management tasks endpoint to avoid route conflicts)
+router.get('/tasks', getVolunteerTasks);
 router.put('/tasks/:taskId/complete', completeTask);
 
 // Volunteer Management Routes (NEW)
 router.get('/assigned-dogs', getAssignedDogs);
-router.get('/tasks', getVolunteerTasks);
 router.put('/tasks/:taskId/status', updateTaskStatus);
 
 // Dogs Management
