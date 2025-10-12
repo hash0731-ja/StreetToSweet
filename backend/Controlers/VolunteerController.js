@@ -228,6 +228,83 @@ const assignTaskToVolunteer = async (req, res) => {
   }
 };
 
+// Unassign a dog from a volunteer
+const unassignDogFromVolunteer = async (req, res) => {
+  try {
+    const { volunteerId, dogId } = req.params;
+
+    const volunteer = await Volunteer.findById(volunteerId);
+    if (!volunteer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
+    }
+
+    const before = volunteer.assignedDogs?.length || 0;
+    volunteer.assignedDogs = (volunteer.assignedDogs || []).filter(ad => String(ad.dogId) !== String(dogId));
+    const after = volunteer.assignedDogs.length;
+    await volunteer.save();
+
+    res.json({
+      status: 'success',
+      message: before === after ? 'No matching dog assignment found' : 'Dog unassigned successfully',
+      data: {
+        volunteer: await Volunteer.findById(volunteerId)
+          .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
+          .populate('userId', 'name email phone')
+      }
+    });
+  } catch (error) {
+    console.error('Unassign dog error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to unassign dog',
+      error: error.message
+    });
+  }
+};
+
+// Unassign a task from a volunteer (and delete the task document)
+const unassignTaskFromVolunteer = async (req, res) => {
+  try {
+    const { volunteerId, taskId } = req.params;
+
+    const volunteer = await Volunteer.findById(volunteerId);
+    if (!volunteer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Volunteer not found'
+      });
+    }
+
+    const before = volunteer.assignedTasks?.length || 0;
+    volunteer.assignedTasks = (volunteer.assignedTasks || []).filter(at => String(at.taskId) !== String(taskId));
+    const after = volunteer.assignedTasks.length;
+    await volunteer.save();
+
+    // Also delete the actual task document if it exists
+    await VolunteerTask.findByIdAndDelete(taskId).catch(() => {});
+
+    res.json({
+      status: 'success',
+      message: before === after ? 'No matching task assignment found' : 'Task unassigned successfully',
+      data: {
+        volunteer: await Volunteer.findById(volunteerId)
+          .populate('assignedDogs.dogId', 'name breed age healthStatus status photo')
+          .populate('userId', 'name email phone')
+      }
+    });
+  } catch (error) {
+    console.error('Unassign task error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to unassign task',
+      error: error.message
+    });
+  }
+};
+
 // Update volunteer status
 const updateVolunteerStatus = async (req, res) => {
   try {
@@ -384,5 +461,7 @@ module.exports = {
   updateVolunteerStatus,
   updateVolunteer,
   deleteVolunteer,
-  getVolunteerTasks
+  getVolunteerTasks,
+  unassignDogFromVolunteer,
+  unassignTaskFromVolunteer
 };

@@ -620,7 +620,10 @@ const fetchVolunteersData = async () => {
         email: editingItem.email,
         phone: editingItem.phone,
         status: editingItem.status,
-        completedTasks: parseInt(editingItem.completedTasks) || 0
+        completedTasks: parseInt(editingItem.completedTasks) || 0,
+        // Optional: include current assigned ids to prevent accidental overwrite
+        assignedDogIds: (editingItem.assignedDogs || []).map(d => d.dogId?._id || d.dogId).filter(Boolean),
+        assignedTaskIds: (editingItem.assignedTasks || []).map(t => t.taskId?._id || t.taskId || t._id).filter(Boolean)
       };
 
       console.log('Updating volunteer with data:', updateData);
@@ -2189,10 +2192,22 @@ const renderAddUserModal = () => (
                       <button 
                         type="button"
                         className="remove-item-btn"
-                        onClick={() => {
-                          const updatedDogs = [...editingItem.assignedDogs];
-                          updatedDogs.splice(index, 1);
-                          setEditingItem({...editingItem, assignedDogs: updatedDogs});
+                        onClick={async () => {
+                          try {
+                            const volunteerId = editingItem._id || editingItem.id;
+                            const dogId = dog.dogId?._id || dog.dogId || dog.id;
+                            if (volunteerId && dogId) {
+                              await axios.delete(`/admin/volunteers/${volunteerId}/assigned-dogs/${dogId}`);
+                            }
+                          } catch (e) {
+                            console.error('Failed to unassign dog', e);
+                          } finally {
+                            const updatedDogs = [...(editingItem.assignedDogs || [])];
+                            updatedDogs.splice(index, 1);
+                            setEditingItem({...editingItem, assignedDogs: updatedDogs});
+                            // also reflect in list
+                            setVolunteersData(prev => prev.map(v => (v._id === (editingItem._id||editingItem.id) || v.id === (editingItem._id||editingItem.id)) ? { ...v, assignedDogs: updatedDogs } : v));
+                          }
                         }}
                       >
                         ×
@@ -2210,10 +2225,21 @@ const renderAddUserModal = () => (
                       <button 
                         type="button"
                         className="remove-item-btn"
-                        onClick={() => {
-                          const updatedTasks = [...editingItem.assignedTasks];
-                          updatedTasks.splice(index, 1);
-                          setEditingItem({...editingItem, assignedTasks: updatedTasks});
+                        onClick={async () => {
+                          try {
+                            const volunteerId = editingItem._id || editingItem.id;
+                            const taskId = task.taskId?._id || task.taskId || task._id || task.id;
+                            if (volunteerId && taskId) {
+                              await axios.delete(`/admin/volunteers/${volunteerId}/assigned-tasks/${taskId}`);
+                            }
+                          } catch (e) {
+                            console.error('Failed to unassign task', e);
+                          } finally {
+                            const updatedTasks = [...(editingItem.assignedTasks || [])];
+                            updatedTasks.splice(index, 1);
+                            setEditingItem({...editingItem, assignedTasks: updatedTasks});
+                            setVolunteersData(prev => prev.map(v => (v._id === (editingItem._id||editingItem.id) || v.id === (editingItem._id||editingItem.id)) ? { ...v, assignedTasks: updatedTasks } : v));
+                          }
                         }}
                       >
                         ×

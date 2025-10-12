@@ -27,7 +27,9 @@ const {
     updateVolunteerStatus,
     updateVolunteer,
     deleteVolunteer,
-    getVolunteerTasks
+    getVolunteerTasks,
+    unassignDogFromVolunteer,
+    unassignTaskFromVolunteer
 } = require('../Controlers/VolunteerController'); // Make sure this path is correct
 
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
@@ -83,6 +85,8 @@ router.get('/volunteers', getAllVolunteers);
 router.get('/volunteers/available/dogs', getAvailableDogs);
 router.post('/volunteers/:volunteerId/assign-dogs', assignDogsToVolunteer);
 router.post('/volunteers/:volunteerId/tasks', assignTaskToVolunteer);
+router.delete('/volunteers/:volunteerId/assigned-dogs/:dogId', unassignDogFromVolunteer);
+router.delete('/volunteers/:volunteerId/assigned-tasks/:taskId', unassignTaskFromVolunteer);
 router.put('/volunteers/:volunteerId', updateVolunteer);
 router.put('/volunteers/:volunteerId/status', updateVolunteerStatus);
 router.delete('/volunteers/:volunteerId', deleteVolunteer);
