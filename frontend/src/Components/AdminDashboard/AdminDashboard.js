@@ -750,7 +750,7 @@ const fetchVolunteersData = async () => {
         await axios.delete(`/adoption-requests/${id}`);
         setAdoptionRequests(prev => prev.filter(req => req.id !== id));
       } else if (type === 'volunteer') {
-        await axios.delete(`/admin/users/${id}`);
+        await axios.delete(`/admin/volunteers/${id}`);
         setVolunteersData(prev => prev.filter(vol => vol.id !== id));
         setUsers(prev => prev.filter(user => user.id !== id));
       }

@@ -475,13 +475,8 @@ const DriverDashboard = () => {
         error => {
           console.warn('Geolocation error:', error);
           setGeoDenied(true);
-          addNotification('Location access denied. Using Sri Lanka center as fallback. You can enable location in your browser site settings.', 'warning');
-
-          // Fallback to Colombo coordinates once if we have none
-          setDriver(prev => ({
-            ...prev,
-            coordinates: prev.coordinates || { lat: 6.9271, lng: 79.8612 }
-          }));
+          addNotification('Location access denied. In-app routing needs location permission. Maps will still use your device location if allowed.', 'warning');
+          // Do not override coordinates with a default; leave as-is so external maps can use device location
         },
         { enableHighAccuracy: true, timeout: 30000, maximumAge: 10000 }
       );
@@ -606,12 +601,8 @@ const DriverDashboard = () => {
             setDriver(prev => ({ ...prev, coordinates: newCoordinates }));
           }
         } catch (e) {
-          // If denied, use fallback
-          const newCoordinates = {
-            lat: 6.9271,
-            lng: 79.8612
-          };
-          setDriver(prev => ({ ...prev, coordinates: newCoordinates }));
+          // If denied, don't override with a default; notify and let external Maps handle device location
+          addNotification('Could not get current location in app. Opening Maps will still use your device location if permitted.', 'warning');
         }
       }
 
@@ -635,7 +626,10 @@ const DriverDashboard = () => {
 
       // Optional: Open external navigation app
       if (window.confirm('Would you like to open this location in your maps app?')) {
-        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${rescue.coordinates.lat},${rescue.coordinates.lng}`;
+        const destination = rescue.location && typeof rescue.location === 'string' && rescue.location.trim().length > 0
+          ? encodeURIComponent(rescue.location)
+          : `${rescue.coordinates.lat},${rescue.coordinates.lng}`;
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
         window.open(mapsUrl, '_blank');
       }
 

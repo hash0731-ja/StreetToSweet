@@ -25,6 +25,7 @@ const {
     assignDogsToVolunteer,
     assignTaskToVolunteer,
     updateVolunteerStatus,
+    updateVolunteer,
     deleteVolunteer,
     getVolunteerTasks
 } = require('../Controlers/VolunteerController'); // Make sure this path is correct
@@ -82,6 +83,7 @@ router.get('/volunteers', getAllVolunteers);
 router.get('/volunteers/available/dogs', getAvailableDogs);
 router.post('/volunteers/:volunteerId/assign-dogs', assignDogsToVolunteer);
 router.post('/volunteers/:volunteerId/tasks', assignTaskToVolunteer);
+router.put('/volunteers/:volunteerId', updateVolunteer);
 router.put('/volunteers/:volunteerId/status', updateVolunteerStatus);
 router.delete('/volunteers/:volunteerId', deleteVolunteer);
 router.get('/volunteers/:volunteerId/tasks', getVolunteerTasks);
