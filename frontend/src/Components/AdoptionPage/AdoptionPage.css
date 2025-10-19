@@ -375,8 +375,8 @@ background-image: linear-gradient( 68.3deg,  rgb(149, 88, 18) 0.4%, rgb(198, 40,
   transform: rotate(90deg);
 }
 
-.modal-image img {
-  width: 400px;
+.modal-image-dog img {
+  width: 500px;
   height: 250px;
   object-fit: cover;
   border-radius: 10px;

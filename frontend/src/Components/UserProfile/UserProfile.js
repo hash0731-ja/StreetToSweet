@@ -17,7 +17,8 @@ import {
   Award,
   Clock,
   Gift,
-  Camera
+  Camera,
+  Dog
 } from 'lucide-react';
 import './UserProfile.css';
 import axios from 'axios';
@@ -379,7 +380,7 @@ const UserProfile = () => {
     <div className="user-profile-container">
       <div className="user-profile-header">
         <h1>My Profile</h1>
-        <p>Welcome back, {userProfile.name || 'User'}! 🐕</p>
+        <p>Welcome back, {userProfile.name || 'User'}! <Dog size={30} color="#0d5344ff"/></p>
         {error && (
           <div className="error-message">
             {error}
@@ -590,19 +591,20 @@ const UserProfile = () => {
           >
             <div className="card-icon volunteer">
               <Users size={24} />
-            </div>
+            </div><br></br><br></br><br></br><br></br>
             {userProfile.isVolunteer ? (
               <>
-                <h3>{userProfile.volunteerHours}</h3>
-                <p>Volunteer Hours</p>
+                {userProfile.volunteerHours > 0 && <h3>{userProfile.volunteerHours}</h3>}
+                <p>Volunteer Contribution</p>
               </>
             ) : (
               <>
-                <h3>0</h3>
                 <p>Become a Volunteer</p>
               </>
             )}
           </div>
+
+          
           
           <div 
             className={`user-profile-summary-card ${activeSection === "events" ? "active" : ""}`} 
@@ -698,38 +700,55 @@ const UserProfile = () => {
           )}
 
           {activeSection === "volunteer" && userProfile.isVolunteer && (
-            <div className="user-profile-section-card">
-              <div className="section-header">
-                <h3><Users size={24} /> Volunteer Dashboard</h3>
-                <button
-                  className="user-profile-btn primary"
-                  onClick={() => navigate('/volunteer/dashboard')}
-                >
-                  Go to Volunteer Hub
-                </button>
-              </div>
-              
-              <div className="volunteer-stats">
-                <div className="stat-item">
-                  <h4>{userProfile.volunteerHours}</h4>
-                  <p>Hours Contributed</p>
-                </div>
-                <div className="stat-item">
-                  <h4>12</h4>
-                  <p>Dogs Walked</p>
-                </div>
-                <div className="stat-item">
-                  <h4>8</h4>
-                  <p>Health Updates</p>
-                </div>
-              </div>
-              
-              <div className="next-task">
-                <h4>Your Next Task</h4>
-                <p>Saturday: Morning feeding shift (8:00 AM - 10:00 AM)</p>
-              </div>
-            </div>
-          )}
+  <div className="user-profile-section-card">
+    <div className="section-header">
+      <h3><Users size={24} /> Volunteer Dashboard</h3>
+      <button
+        className="user-profile-btn primary"
+        onClick={() => navigate('/volunteer/dashboard')}
+      >
+        Go to Volunteer Hub
+      </button>
+    </div>
+    
+    <div className="volunteer-content">
+      <div className="volunteer-welcome">
+        <h4>Thank You for Being a Volunteer!</h4>
+        <p>
+          Your dedication and compassion make a real difference in the lives of our rescue dogs. 
+          As a volunteer, you're an essential part of our mission to provide love, care, and 
+          second chances to dogs in need.
+        </p>
+      </div>
+      
+      {userProfile.volunteerHours > 0 && (
+        <div className="volunteer-stats">
+          <div className="volunteer-stat-card">
+            <h4>{userProfile.volunteerHours}</h4>
+            <p>Hours Contributed</p>
+          </div>
+        </div>
+      )}
+      
+      <div className="volunteer-message">
+        <p>
+          <strong>Your impact matters:</strong> Every hour you spend with our dogs helps socialize them, 
+          build their confidence, and prepare them for their forever homes. Whether you're walking dogs, 
+          assisting with feeding, helping with cleaning, or simply providing companionship, you're 
+          contributing to their wellbeing and adoption success.
+        </p>
+        
+        <div className="volunteer-reminder">
+          <h5>Ready to make a difference today?</h5>
+          <p>
+            Check the Volunteer Hub to see available shifts, upcoming events, and current needs. 
+            Your continued support helps us save more lives every day!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
           {activeSection === "events" && (
             <div className="user-profile-section-card">

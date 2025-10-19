@@ -1732,7 +1732,9 @@ button.my-ad-btn:hover {
   color: #666;
 }
 
-
+.stat-number{
+  color: #efeeee;
+}
 
 .report-summary-auto {
   margin: 1rem 0;

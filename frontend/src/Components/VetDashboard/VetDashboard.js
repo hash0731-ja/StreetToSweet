@@ -22,7 +22,10 @@ import {
   Users,
   Eye,
   Check,
-  XCircle
+  XCircle,
+  Edit,
+  Trash2,
+  History
 } from "lucide-react";
 import "./VetDashboard.css";
 
@@ -38,10 +41,15 @@ const VetDashboard = () => {
   const [showVaccinationForm, setShowVaccinationForm] = useState(false);
   const [showCertificationForm, setShowCertificationForm] = useState(false);
   const [showAdoptionDetails, setShowAdoptionDetails] = useState(false);
+  const [showMedicalRecords, setShowMedicalRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000";
   const [loading, setLoading] = useState(true);
+  const [medicalRecords, setMedicalRecords] = useState([]);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [recordTypeFilter, setRecordTypeFilter] = useState("all");
+
   const [treatmentForm, setTreatmentForm] = useState({
     diagnosis: "",
     treatment: "",
@@ -74,6 +82,12 @@ const VetDashboard = () => {
     if (!dateString) return "N/A";
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  // Format date for input fields
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+    return new Date(dateString).toISOString().split('T')[0];
   };
 
   useEffect(() => {
@@ -194,6 +208,212 @@ const VetDashboard = () => {
     }
   };
 
+  // Fetch medical records for a dog
+  const fetchMedicalRecords = async (dogId) => {
+    try {
+      const response = await axios.get(`${API_BASE}/vet/dogs/${dogId}/medical-records`, authHeader());
+      setMedicalRecords(response.data?.data?.records || []);
+      setShowMedicalRecords(true);
+    } catch (error) {
+      console.error("Failed to fetch medical records:", error);
+      alert("Failed to load medical records");
+    }
+  };
+
+  // Handle viewing medical records
+  const handleViewMedicalRecords = (dog) => {
+    setSelectedDog(dog);
+    fetchMedicalRecords(dog._id);
+  };
+
+  // Handle editing a medical record
+  const handleEditRecord = (record) => {
+    setEditingRecord(record);
+    if (record.recordType === "treatment") {
+      setTreatmentForm({
+        diagnosis: record.title || "",
+        treatment: record.treatment?.procedure || "",
+        medication: record.medications?.[0]?.name || "",
+        dosage: record.medications?.[0]?.dosage || "",
+        notes: record.description || ""
+      });
+      setShowTreatmentForm(true);
+    } else if (record.recordType === "vaccination") {
+      setVaccinationForm({
+        vaccineType: record.vaccination?.name || "",
+        batchNumber: record.vaccination?.batchNumber || "",
+        nextDueDate: formatDateForInput(record.vaccination?.nextDueDate),
+        notes: record.description || ""
+      });
+      setShowVaccinationForm(true);
+    }
+  };
+
+  // Handle deleting a medical record
+  const handleDeleteRecord = async (recordId) => {
+    if (!window.confirm("Are you sure you want to delete this medical record?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE}/vet/medical-records/${recordId}`, authHeader());
+      // Refresh medical records
+      if (selectedDog) {
+        fetchMedicalRecords(selectedDog._id);
+      }
+      alert("Medical record deleted successfully");
+    } catch (error) {
+      console.error("Failed to delete medical record:", error);
+      alert("Failed to delete medical record");
+    }
+  };
+
+  // Update treatment submission to handle both create and edit
+  const handleAddTreatment = async () => {
+    if (!(treatmentForm.diagnosis && treatmentForm.treatment) || !selectedDog) return;
+    
+    try {
+      if (editingRecord) {
+        // Update existing treatment
+        await axios.put(
+          `${API_BASE}/vet/medical-records/${editingRecord._id}`,
+          { 
+            title: treatmentForm.diagnosis,
+            description: treatmentForm.notes,
+            treatment: { procedure: treatmentForm.treatment },
+            medications: treatmentForm.medication ? [{ 
+              name: treatmentForm.medication, 
+              dosage: treatmentForm.dosage 
+            }] : []
+          },
+          authHeader()
+        );
+        alert("Treatment updated successfully!");
+      } else {
+        // Create new treatment
+        await axios.post(
+          `${API_BASE}/vet/dogs/${selectedDog._id}/treatments`,
+          { ...treatmentForm },
+          authHeader()
+        );
+        alert("Treatment recorded successfully!");
+      }
+
+      // Refresh dogs data
+      const res = await axios.get(`${API_BASE}/vet/dogs`, authHeader());
+      const list = res.data?.data?.dogs || [];
+      setDogs(
+        list.map((d) => ({
+          _id: d._id,
+          name: d.name,
+          status: normalizeStatus(d.healthStatus),
+          photo: d.photo ? `${API_BASE}/uploads/dogs/${d.photo}` : "https://placehold.co/300x300?text=Dog",
+          breed: d.breed || "",
+          age: d.age || "",
+          lastCheckup: d.updatedAt,
+          nextCheckup: d.nextCheckup,
+          healthCertified: d.healthCertified || false,
+          vaccinations: d.vaccinations || [],
+          medicalHistory: d.medicalHistory || [],
+        }))
+      );
+
+      // Refresh medical records if viewing
+      if (showMedicalRecords && selectedDog) {
+        fetchMedicalRecords(selectedDog._id);
+      }
+
+      setShowTreatmentForm(false);
+      setTreatmentForm({ diagnosis: "", treatment: "", medication: "", dosage: "", notes: "" });
+      setEditingRecord(null);
+    } catch (e) {
+      console.error("Save treatment failed", e);
+      alert("Failed to save treatment");
+    }
+  };
+
+  // Update vaccination submission to handle both create and edit
+  const handleAddVaccination = async () => {
+    if (!(vaccinationForm.vaccineType && vaccinationForm.batchNumber) || !selectedDog) return;
+    
+    try {
+      if (editingRecord) {
+        // Update existing vaccination
+        await axios.put(
+          `${API_BASE}/vet/medical-records/${editingRecord._id}`,
+          {
+            title: `Vaccination - ${vaccinationForm.vaccineType}`,
+            description: vaccinationForm.notes,
+            vaccination: {
+              name: vaccinationForm.vaccineType,
+              batchNumber: vaccinationForm.batchNumber,
+              nextDueDate: vaccinationForm.nextDueDate
+            }
+          },
+          authHeader()
+        );
+        alert("Vaccination updated successfully!");
+      } else {
+        // Create new vaccination
+        await axios.post(
+          `${API_BASE}/vet/dogs/${selectedDog._id}/vaccinations`,
+          {
+            vaccineType: vaccinationForm.vaccineType,
+            batchNumber: vaccinationForm.batchNumber,
+            nextDueDate: vaccinationForm.nextDueDate,
+            notes: vaccinationForm.notes,
+          },
+          authHeader()
+        );
+        alert("Vaccination recorded successfully!");
+      }
+
+      // Refresh dogs data
+      const res = await axios.get(`${API_BASE}/vet/dogs`, authHeader());
+      const list = res.data?.data?.dogs || [];
+      setDogs(
+        list.map((d) => ({
+          _id: d._id,
+          name: d.name,
+          status: normalizeStatus(d.healthStatus),
+          photo: d.photo ? `${API_BASE}/uploads/dogs/${d.photo}` : "https://placehold.co/300x300?text=Dog",
+          breed: d.breed || "",
+          age: d.age || "",
+          lastCheckup: d.updatedAt,
+          nextCheckup: d.nextCheckup,
+          healthCertified: d.healthCertified || false,
+          vaccinations: d.vaccinations || [],
+          medicalHistory: d.medicalHistory || [],
+        }))
+      );
+
+      // Refresh medical records if viewing
+      if (showMedicalRecords && selectedDog) {
+        fetchMedicalRecords(selectedDog._id);
+      }
+
+      setShowVaccinationForm(false);
+      setVaccinationForm({ vaccineType: "", batchNumber: "", nextDueDate: "", notes: "" });
+      setEditingRecord(null);
+    } catch (e) {
+      console.error("Save vaccination failed", e);
+      alert("Failed to save vaccination");
+    }
+  };
+
+  // Reset forms when modals close
+  const handleCloseTreatmentForm = () => {
+    setShowTreatmentForm(false);
+    setTreatmentForm({ diagnosis: "", treatment: "", medication: "", dosage: "", notes: "" });
+    setEditingRecord(null);
+  };
+
+  const handleCloseVaccinationForm = () => {
+    setShowVaccinationForm(false);
+    setVaccinationForm({ vaccineType: "", batchNumber: "", nextDueDate: "", notes: "" });
+    setEditingRecord(null);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("vetId");
     localStorage.removeItem("authToken");
@@ -255,90 +475,6 @@ const VetDashboard = () => {
   };
 
   // Existing vet functions
-  const handleAddTreatment = async () => {
-    if (!(treatmentForm.diagnosis && treatmentForm.treatment) || !selectedDog) return;
-    try {
-      await axios.post(
-        `${API_BASE}/vet/dogs/${selectedDog._id}/treatments`,
-        { ...treatmentForm },
-        authHeader()
-      );
-      // Refresh dogs minimal fields locally
-      setDogs((prev) =>
-        prev.map((d) =>
-          d._id === selectedDog._id
-            ? {
-                ...d,
-                lastCheckup: new Date().toISOString(),
-                status: treatmentForm.diagnosis.toLowerCase().includes("routine")
-                  ? "Healthy"
-                  : treatmentForm.diagnosis.toLowerCase().includes("infection")
-                  ? "Recovering"
-                  : "Needs Attention",
-                medicalHistory: [
-                  {
-                    _id: Math.random().toString(36).substr(2, 9),
-                    date: new Date().toISOString().split("T")[0],
-                    type: "Treatment",
-                    ...treatmentForm,
-                  },
-                  ...d.medicalHistory,
-                ],
-              }
-            : d
-        )
-      );
-      setShowTreatmentForm(false);
-      setTreatmentForm({ diagnosis: "", treatment: "", medication: "", dosage: "", notes: "" });
-      alert("Treatment recorded successfully!");
-    } catch (e) {
-      console.error("Save treatment failed", e);
-      alert("Failed to save treatment");
-    }
-  };
-
-  const handleAddVaccination = async () => {
-    if (!(vaccinationForm.vaccineType && vaccinationForm.batchNumber) || !selectedDog) return;
-    try {
-      await axios.post(
-        `${API_BASE}/vet/dogs/${selectedDog._id}/vaccinations`,
-        {
-          vaccineType: vaccinationForm.vaccineType,
-          batchNumber: vaccinationForm.batchNumber,
-          nextDueDate: vaccinationForm.nextDueDate,
-          notes: vaccinationForm.notes,
-        },
-        authHeader()
-      );
-      setDogs((prev) =>
-        prev.map((d) =>
-          d._id === selectedDog._id
-            ? {
-                ...d,
-                lastCheckup: new Date().toISOString(),
-                vaccinations: [
-                  {
-                    _id: Math.random().toString(36).substr(2, 9),
-                    date: new Date().toISOString().split("T")[0],
-                    vaccineType: vaccinationForm.vaccineType,
-                    batchNumber: vaccinationForm.batchNumber,
-                    nextDueDate: vaccinationForm.nextDueDate,
-                  },
-                  ...d.vaccinations,
-                ],
-              }
-            : d
-        )
-      );
-      setShowVaccinationForm(false);
-      setVaccinationForm({ vaccineType: "", batchNumber: "", nextDueDate: "", notes: "" });
-      alert("Vaccination recorded successfully!");
-    } catch (e) {
-      console.error("Save vaccination failed", e);
-      alert("Failed to save vaccination");
-    }
-  };
-
   const handleCertifyHealth = async () => {
     if (!certificationForm.healthStatus || !selectedDog) return;
     try {
@@ -413,6 +549,12 @@ const VetDashboard = () => {
     setSelectedAdoption(adoption);
     setShowAdoptionDetails(true);
   };
+
+  // Filter medical records by type
+  const filteredMedicalRecords = medicalRecords.filter(record => {
+    if (recordTypeFilter === "all") return true;
+    return record.recordType === recordTypeFilter;
+  });
 
   return (
     <div className="vet-dashboard">
@@ -603,6 +745,14 @@ const VetDashboard = () => {
                         <FileText size={16} />
                         Download Report
                       </button>
+                      <button
+                        className="vet-btn"
+                        onClick={() => handleViewMedicalRecords(dog)}
+                        title="View Medical History"
+                      >
+                        <History size={16} />
+                        View Records
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -720,6 +870,105 @@ const VetDashboard = () => {
         </div>
       )}
 
+      {/* Medical Records Modal */}
+      {showMedicalRecords && selectedDog && (
+        <div className="vet-modal-overlay">
+          <div className="vet-modal large">
+            <div className="vet-modal-header">
+              <h3>Medical Records - {selectedDog.name}</h3>
+              <button className="vet-close-btn" onClick={() => setShowMedicalRecords(false)}>×</button>
+            </div>
+            <div className="vet-modal-content">
+              <div className="vet-records-filter">
+                <select
+                  value={recordTypeFilter}
+                  onChange={(e) => setRecordTypeFilter(e.target.value)}
+                >
+                  <option value="all">All Records</option>
+                  <option value="treatment">Treatments</option>
+                  <option value="vaccination">Vaccinations</option>
+                  <option value="note">Notes</option>
+                </select>
+              </div>
+              
+              <div className="vet-records-list">
+                {filteredMedicalRecords.length === 0 ? (
+                  <div className="vet-empty-state">
+                    <FileText size={32} />
+                    <p>No medical records found</p>
+                  </div>
+                ) : (
+                  filteredMedicalRecords.map(record => (
+                    <div key={record._id} className="vet-record-item">
+                      <div className="vet-record-header">
+                        <div className="vet-record-title">
+                          <h4>{record.title}</h4>
+                          <span className={`vet-record-type ${record.recordType}`}>
+                            {record.recordType}
+                          </span>
+                        </div>
+                        <div className="vet-record-actions">
+                          <button 
+                            className="vet-btn-icon"
+                            onClick={() => handleEditRecord(record)}
+                            title="Edit Record"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button 
+                            className="vet-btn-icon danger"
+                            onClick={() => handleDeleteRecord(record._id)}
+                            title="Delete Record"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="vet-record-details">
+                        <p><strong>Date:</strong> {formatDate(record.createdAt)}</p>
+                        <p><strong>Administered by:</strong> {record.administeredBy?.name || "Veterinarian"}</p>
+                        
+                        {record.description && (
+                          <p><strong>Notes:</strong> {record.description}</p>
+                        )}
+                        
+                        {record.recordType === "treatment" && record.treatment?.procedure && (
+                          <p><strong>Treatment:</strong> {record.treatment.procedure}</p>
+                        )}
+                        
+                        {record.recordType === "treatment" && record.medications?.length > 0 && (
+                          <div>
+                            <strong>Medications:</strong>
+                            {record.medications.map((med, index) => (
+                              <div key={index} className="vet-medication-item">
+                                {med.name} {med.dosage && `- ${med.dosage}`}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {record.recordType === "vaccination" && record.vaccination && (
+                          <div>
+                            <p><strong>Batch Number:</strong> {record.vaccination.batchNumber}</p>
+                            {record.vaccination.nextDueDate && (
+                              <p><strong>Next Due:</strong> {formatDate(record.vaccination.nextDueDate)}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="vet-modal-actions">
+              <button className="vet-btn" onClick={() => setShowMedicalRecords(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Adoption Details Modal */}
       {showAdoptionDetails && selectedAdoption && (
         <div className="vet-modal-overlay">
@@ -793,8 +1042,8 @@ const VetDashboard = () => {
         <div className="vet-modal-overlay">
           <div className="vet-modal">
             <div className="vet-modal-header">
-              <h3>Log Treatment for {selectedDog.name}</h3>
-              <button className="vet-close-btn" onClick={() => setShowTreatmentForm(false)}>×</button>
+              <h3>{editingRecord ? "Edit Treatment" : "Log Treatment"} for {selectedDog.name}</h3>
+              <button className="vet-close-btn" onClick={handleCloseTreatmentForm}>×</button>
             </div>
             <div className="vet-modal-content">
               <div className="vet-form-group">
@@ -846,8 +1095,10 @@ const VetDashboard = () => {
               </div>
             </div>
             <div className="vet-modal-actions">
-              <button className="vet-btn" onClick={() => setShowTreatmentForm(false)}>Cancel</button>
-              <button className="vet-btn primary" onClick={handleAddTreatment}>Save Treatment</button>
+              <button className="vet-btn" onClick={handleCloseTreatmentForm}>Cancel</button>
+              <button className="vet-btn primary" onClick={handleAddTreatment}>
+                {editingRecord ? "Update Treatment" : "Save Treatment"}
+              </button>
             </div>
           </div>
         </div>
@@ -857,8 +1108,8 @@ const VetDashboard = () => {
         <div className="vet-modal-overlay">
           <div className="vet-modal">
             <div className="vet-modal-header">
-              <h3>Add Vaccination for {selectedDog.name}</h3>
-              <button className="vet-close-btn" onClick={() => setShowVaccinationForm(false)}>×</button>
+              <h3>{editingRecord ? "Edit Vaccination" : "Add Vaccination"} for {selectedDog.name}</h3>
+              <button className="vet-close-btn" onClick={handleCloseVaccinationForm}>×</button>
             </div>
             <div className="vet-modal-content">
               <div className="vet-form-group">
@@ -904,8 +1155,10 @@ const VetDashboard = () => {
               </div>
             </div>
             <div className="vet-modal-actions">
-              <button className="vet-btn" onClick={() => setShowVaccinationForm(false)}>Cancel</button>
-              <button className="vet-btn primary" onClick={handleAddVaccination}>Save Vaccination</button>
+              <button className="vet-btn" onClick={handleCloseVaccinationForm}>Cancel</button>
+              <button className="vet-btn primary" onClick={handleAddVaccination}>
+                {editingRecord ? "Update Vaccination" : "Save Vaccination"}
+              </button>
             </div>
           </div>
         </div>

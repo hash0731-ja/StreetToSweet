@@ -82,55 +82,174 @@ const Donate = () => {
     email: "",
     recurring: false,
     frequency: "One-time",
+    paymentMethod: "",
+    cardHolderName: "",
+    cardNumber: "",
+    cvv: "",
+    expiryDate: "",
+    paypalAccount: "",
+    paypalName: "",
+    paypalTransactionId: "",
+    bankAccount: "",
+    bankName: "",
+    bankHolderName: "",
+    bankReference: ""
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  const handleChange = (e) => {
-  const { name, value, type, checked } = e.target;
-  let newValue = type === "checkbox" ? checked : value;
-  let newErrors = { ...errors }; // keep track of validation errors
-
-  // ===== Validation rules =====
-  if (name === "cardNumber") {
-    newValue = newValue.replace(/\D/g, "").slice(0, 16);
-    newErrors.cardNumber =
-      newValue.length !== 16 ? "error" : "";
-  }
-
-  if (name === "cvv") {
-    newValue = newValue.replace(/\D/g, "").slice(0, 3);
-    newErrors.cvv = newValue.length !== 3 ? "CVV must be 3 digits" : "";
-  }
-
-  if (name === "expiryDate") {
-    newValue = newValue.replace(/[^\d/]/g, "").slice(0, 5);
-    if (newValue.length === 2 && !newValue.includes("/")) {
-      newValue = newValue + "/";
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Amount validation
+    if (!donation.amount || Number(donation.amount) <= 0) {
+      newErrors.amount = "Please enter a valid donation amount";
+    } else if (Number(donation.amount) > 100000) {
+      newErrors.amount = "Donation amount cannot exceed Rs. 100,000";
     }
-    newErrors.expiryDate =
-      !/^(0[1-9]|1[0-2])\/\d{2}$/.test(newValue) ? "Invalid MM/YY" : "";
-  }
+    
+    // Payment method validation
+    if (!donation.paymentMethod) {
+      newErrors.paymentMethod = "Please select a payment method";
+    }
+    
+    // Credit/Debit Card validations
+    if (donation.paymentMethod === "Credit/Debit Card") {
+      if (!donation.cardHolderName?.trim()) {
+        newErrors.cardHolderName = "Cardholder name is required";
+      }
+      
+      if (!donation.cardNumber || donation.cardNumber.length !== 16) {
+        newErrors.cardNumber = "Card number must be 16 digits";
+      }
+      
+      if (!donation.cvv || donation.cvv.length !== 3) {
+        newErrors.cvv = "CVV must be 3 digits";
+      }
+      
+      if (!donation.expiryDate || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(donation.expiryDate)) {
+        newErrors.expiryDate = "Please enter a valid expiry date (MM/YY)";
+      } else {
+        // Check if card is expired
+        const [month, year] = donation.expiryDate.split('/');
+        const expiry = new Date(2000 + parseInt(year), parseInt(month) - 1);
+        const today = new Date();
+        if (expiry < today) {
+          newErrors.expiryDate = "Card has expired";
+        }
+      }
+    }
+    
+    // PayPal validations
+    if (donation.paymentMethod === "PayPal") {
+      if (!donation.paypalAccount) {
+        newErrors.paypalAccount = "PayPal email is required";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(donation.paypalAccount)) {
+        newErrors.paypalAccount = "Please enter a valid email address";
+      }
+    }
+    
+    // Bank Transfer validations
+    if (donation.paymentMethod === "Bank Transfer") {
+      if (!donation.bankAccount) {
+        newErrors.bankAccount = "Bank account number is required";
+      } else if (donation.bankAccount.length < 6) {
+        newErrors.bankAccount = "Bank account number seems too short";
+      }
+      
+      if (!donation.bankHolderName?.trim()) {
+        newErrors.bankHolderName = "Account holder name is required";
+      }
+    }
+    
+    return newErrors;
+  };
 
-  if (name === "bankAccount") {
-    newValue = newValue.replace(/\D/g, "");
-    newErrors.bankAccount =
-      newValue.length < 6 ? "Bank account number seems too short" : "";
-  }
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    let newValue = type === "checkbox" ? checked : value;
+    let newErrors = { ...errors };
 
-  if (name === "paypalAccount") {
-    newErrors.paypalAccount =
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newValue) ? "Invalid email" : "";
-  }
+    // Clear error for this field when user starts typing
+    if (newErrors[name]) {
+      delete newErrors[name];
+    }
 
-  // ===== Update state =====
-  setErrors(newErrors); // save error messages
-  setDonation({
-    ...donation,
-    [name]: newValue,
-  });
-};
+    // ===== Validation rules =====
+    if (name === "amount") {
+      if (newValue && (Number(newValue) <= 0 || Number(newValue) > 100000)) {
+        newErrors.amount = "Amount must be between Rs. 1 and Rs. 100,000";
+      } else {
+        delete newErrors.amount;
+      }
+    }
 
+    if (name === "cardNumber") {
+      newValue = newValue.replace(/\D/g, "").slice(0, 16);
+      if (newValue && newValue.length !== 16) {
+        newErrors.cardNumber = "Card number must be 16 digits";
+      } else {
+        delete newErrors.cardNumber;
+      }
+    }
+
+    if (name === "cvv") {
+      newValue = newValue.replace(/\D/g, "").slice(0, 3);
+      if (newValue && newValue.length !== 3) {
+        newErrors.cvv = "CVV must be 3 digits";
+      } else {
+        delete newErrors.cvv;
+      }
+    }
+
+    if (name === "expiryDate") {
+      newValue = newValue.replace(/[^\d/]/g, "").slice(0, 5);
+      if (newValue.length === 2 && !newValue.includes("/")) {
+        newValue = newValue + "/";
+      }
+      if (newValue && !/^(0[1-9]|1[0-2])\/\d{2}$/.test(newValue)) {
+        newErrors.expiryDate = "Invalid MM/YY format";
+      } else {
+        delete newErrors.expiryDate;
+      }
+    }
+
+    if (name === "bankAccount") {
+      newValue = newValue.replace(/\D/g, "");
+      if (newValue && newValue.length < 6) {
+        newErrors.bankAccount = "Bank account number seems too short";
+      } else {
+        delete newErrors.bankAccount;
+      }
+    }
+
+    if (name === "paypalAccount") {
+      if (newValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newValue)) {
+        newErrors.paypalAccount = "Invalid email format";
+      } else {
+        delete newErrors.paypalAccount;
+      }
+    }
+
+    if (name === "cardHolderName" && newValue && !/^[a-zA-Z\s]+$/.test(newValue)) {
+      newErrors.cardHolderName = "Name can only contain letters and spaces";
+    } else if (name === "cardHolderName") {
+      delete newErrors.cardHolderName;
+    }
+
+    if (name === "bankHolderName" && newValue && !/^[a-zA-Z\s]+$/.test(newValue)) {
+      newErrors.bankHolderName = "Name can only contain letters and spaces";
+    } else if (name === "bankHolderName") {
+      delete newErrors.bankHolderName;
+    }
+
+    // ===== Update state =====
+    setErrors(newErrors);
+    setDonation({
+      ...donation,
+      [name]: newValue,
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -141,13 +260,10 @@ const Donate = () => {
       return;
     }
 
-    if (!donation.amount || Number(donation.amount) <= 0) {
-      setSubmitError("Please select or enter a valid amount.");
-      return;
-    }
-
-    if (!donation.paymentMethod) {
-      setSubmitError("Please choose a payment method.");
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      setSubmitError("Please fix the errors below before submitting.");
       return;
     }
 
@@ -268,7 +384,7 @@ const Donate = () => {
 
   {/* Progress / Goal Tracker */}
   <div className="goal-tracker">
-    <p>This month’s goal: Rs. 50,000 → <span>72% Reached</span></p>
+    <p>This month's goal: Rs. 50,000 → <span>72% Reached</span></p>
     <div className="progress-bar">
       <div className="progress-filled"></div>
     </div>
@@ -301,6 +417,12 @@ const Donate = () => {
         {submitError && (
           <div className="error-msg" style={{ marginBottom: 12 }}>{submitError}</div>
         )}
+        
+        {/* Amount validation error */}
+        {errors.amount && (
+          <div className="error-msg" style={{ marginBottom: 12 }}>{errors.amount}</div>
+        )}
+        
         {/* Preset Amounts */}
         <div className="preset-amounts">
           {["500", "1000", "2500"].map((amt) => (
@@ -317,6 +439,8 @@ const Donate = () => {
             type="number"
             name="amount"
             placeholder="Custom"
+            min="1"
+            max="100000"
             value={
               donation.amount &&
               !["500", "1000", "2500"].includes(donation.amount.toString())
@@ -353,12 +477,16 @@ const Donate = () => {
             value={donation.paymentMethod || ""}
             onChange={handleChange}
             required
+            className={errors.paymentMethod ? "error" : ""}
           >
             <option value="">Select Method</option>
             <option value="Credit/Debit Card">Credit/Debit Card</option>
             <option value="PayPal">PayPal</option>
             <option value="Bank Transfer">Bank Transfer</option>
           </select>
+          {errors.paymentMethod && (
+            <span className="error-msg">{errors.paymentMethod}</span>
+          )}
 
           {/* Credit/Debit Card */}
           {donation.paymentMethod === "Credit/Debit Card" && (
@@ -371,28 +499,41 @@ const Donate = () => {
                 onChange={handleChange}
                 placeholder="Enter cardholder name"
                 required
+                className={errors.cardHolderName ? "error" : ""}
               />
+              {errors.cardHolderName && (
+                <span className="error-msg">{errors.cardHolderName}</span>
+              )}
 
               <div className="credit-card-row">
-                <input
-                  type="text"
-                  name="cardNumber"
-                  value={donation.cardNumber || ""}
-                  onChange={handleChange}
-                  placeholder="Card Number"
-                  required
-                />
-                {errors.cardNumber && (
-      <span className="error-msg">{errors.cardNumber}</span>)}
-                <input
-                  type="text"
-                  name="cvv"
-                  value={donation.cvv || ""}
-                  onChange={handleChange}
-                  placeholder="CVV"
-                  required
-                />{errors.cardNumber && (
-      <span className="error-msg">{errors.cardNumber}</span>)}
+                <div className="input-group">
+                  <input
+                    type="text"
+                    name="cardNumber"
+                    value={donation.cardNumber || ""}
+                    onChange={handleChange}
+                    placeholder="Card Number"
+                    required
+                    className={errors.cardNumber ? "error" : ""}
+                  />
+                  {errors.cardNumber && (
+                    <span className="error-msg">{errors.cardNumber}</span>
+                  )}
+                </div>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    name="cvv"
+                    value={donation.cvv || ""}
+                    onChange={handleChange}
+                    placeholder="CVV"
+                    required
+                    className={errors.cvv ? "error" : ""}
+                  />
+                  {errors.cvv && (
+                    <span className="error-msg">{errors.cvv}</span>
+                  )}
+                </div>
               </div>
 
               <label>Expiry Date (MM/YY):</label>
@@ -402,9 +543,12 @@ const Donate = () => {
                 value={donation.expiryDate || ""}
                 onChange={handleChange}
                 placeholder="MM/YY"
+                required
+                className={errors.expiryDate ? "error" : ""}
               />
-              {errors.cardNumber && (
-      <span className="error-msg">{errors.cardNumber}</span>)}
+              {errors.expiryDate && (
+                <span className="error-msg">{errors.expiryDate}</span>
+              )}
             </div>
           )}
 
@@ -419,8 +563,11 @@ const Donate = () => {
                 onChange={handleChange}
                 placeholder="Enter PayPal email"
                 required
-              />{errors.cardNumber && (
-      <span className="error-msg">{errors.cardNumber}</span>)}
+                className={errors.paypalAccount ? "error" : ""}
+              />
+              {errors.paypalAccount && (
+                <span className="error-msg">{errors.paypalAccount}</span>
+              )}
               <label>Donor Full Name (Optional):</label>
               <input
                 type="text"
@@ -451,8 +598,11 @@ const Donate = () => {
                 onChange={handleChange}
                 placeholder="Enter bank account number"
                 required
-              />{errors.cardNumber && (
-      <span className="error-msg">{errors.cardNumber}</span>)}
+                className={errors.bankAccount ? "error" : ""}
+              />
+              {errors.bankAccount && (
+                <span className="error-msg">{errors.bankAccount}</span>
+              )}
               <label>Bank Name (Optional):</label>
               <input
                 type="text"
@@ -461,14 +611,19 @@ const Donate = () => {
                 onChange={handleChange}
                 placeholder="Enter bank name"
               />
-              <label>Account Holder Name (Optional):</label>
+              <label>Account Holder Name:</label>
               <input
                 type="text"
                 name="bankHolderName"
                 value={donation.bankHolderName || ""}
                 onChange={handleChange}
                 placeholder="Enter account holder name"
+                required
+                className={errors.bankHolderName ? "error" : ""}
               />
+              {errors.bankHolderName && (
+                <span className="error-msg">{errors.bankHolderName}</span>
+              )}
               <label>Reference / Transaction ID (Optional):</label>
               <input
                 type="text"

@@ -560,21 +560,30 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
 }
 
 /* Past Events Section */
-.past-events {
+.past--events {
   text-align: center;
   margin: 60px auto;
   width: 100%;
-  padding: 40px 20px;
+  padding: 40px 30px;
   background: linear-gradient(135deg, #fff9f2, #fbe4d6);
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-  margin-top: -3%;
+  margin-top: -5%;
+  margin-bottom: 0%;
 }
 
-.past-events h2 {
-  font-size: 2.5rem;
-  color: #f38b6a;
-  margin-bottom: 40px;
-  text-shadow: 1px 1px 10px rgba(243,139,106,0.2);
+.past--events h2 {
+  font-size: 2.8rem;
+  color: #3e54be;
+  text-shadow: 2px 2px 20px rgba(243,139,106,0.2);
+  margin-bottom: 20px;
+}
+
+.past--events p {
+  font-size: 1.1rem;
+  color: #5a4b4b;
+  max-width: 900px;
+  margin: 0 auto 40px auto;
+  line-height: 1.6;
 }
 
 /* Past Carousel as Grid */
@@ -672,12 +681,12 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
 /* Involvement Section */
 .involved-section {
   text-align: center;
-  padding: 60px 20px;
+  padding: 30px 20px;
   background: linear-gradient(135deg, #fff5f0, #ffe9e3);
   max-width: 1600px;
   margin: 60px auto;
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-  margin-top: -50px;
+  margin-top: -5%;
 }
 
 .involved-section h2 {
@@ -705,6 +714,7 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 8px 20px rgba(0,0,0,0.12);
   position: relative;
+
 }
 
 .involve-card:hover {
@@ -901,7 +911,7 @@ background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(2,37
 /* Involvement Section */
 .involved-section {
   text-align: center;
-  padding: 60px 20px;
+  padding: 50px 20px;
   background: linear-gradient(135deg, #fff5f0, #ffe9e3);
   border-radius: 25px;
   width: 100%;

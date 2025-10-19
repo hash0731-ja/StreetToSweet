@@ -491,14 +491,14 @@
 .staff-section {
   padding: 60px 20px;
   text-align: center;
-  background: linear-gradient(135deg, #b2daff, #808fff);
+  background: linear-gradient(135deg, #deedfb, #e7e9fd);
 }
 
 .staff-section h2 {
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 40px;
-  background: linear-gradient(90deg, #00aafffe, #286cff);
+  background: linear-gradient(90deg, #19719dfe, #286cff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -513,7 +513,7 @@
 
 .staff-card {
   flex: 0 0 250px;
-  background: linear-gradient(145deg, #e0f8ff, #b2ceff);
+  background: linear-gradient(145deg, #82bdcf, #81aefc);
   padding: 25px 20px;
   border-radius: 20px;
   text-align: center;
@@ -555,7 +555,7 @@
   border: 4px solid;
   border-image-slice: 1;
   border-width: 4px;
-  border-image-source: linear-gradient(45deg, #00bbff, #2861ff);
+  border-image-source: linear-gradient(45deg, #0399d0, #2861ff);
   z-index: 1;
   position: relative;
 }
@@ -564,7 +564,7 @@
   font-size: 1.3rem;
   font-weight: 700;
   margin-bottom: 5px;
-  color: #bf360c;
+  color: #3c08a2;
   z-index: 1;
   position: relative;
 }
@@ -573,7 +573,7 @@
   font-size: 1rem;
   font-weight: 500;
   margin-bottom: 10px;
-  background: linear-gradient(90deg, #112b4c, #28bfff);
+  background: linear-gradient(90deg, #f0fcff, #ffffff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   z-index: 1;
@@ -582,7 +582,7 @@
 
 .staff-card .bio {
   font-size: 0.9rem;
-  color: #5d4037;
+  color: #87f7ff;
   line-height: 1.4;
   z-index: 1;
   position: relative;

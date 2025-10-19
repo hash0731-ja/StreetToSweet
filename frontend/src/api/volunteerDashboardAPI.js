@@ -306,6 +306,62 @@ class VolunteerDashboardAPI {
         
         return formData;
     }
+
+
+    // Add these methods to your VolunteerDashboardAPI class
+
+// Delete health report
+async deleteHealthReport(reportId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/volunteer/dashboard/health-reports/${reportId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to delete health report');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error deleting health report:', error);
+    throw error;
+  }
+}
+
+// Delete walk log
+async deleteWalkLog(walkId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/volunteer/dashboard/walks/${walkId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to delete walk log');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error deleting walk log:', error);
+    throw error;
+  }
+}
+
+// Get walk details (if needed)
+async getWalkDetails(walkId) {
+  return await this.apiCall(`/volunteer/dashboard/walks/${walkId}`);
+}
+
+
+
+
+
+
 }
 
 // Usage examples:

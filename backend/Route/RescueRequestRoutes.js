@@ -10,7 +10,10 @@ const {
     updateRescueRequestStatus,
     assignDriverToRequest,
     getMyRescueRequests,
-    getAvailableDrivers
+    getAvailableDrivers,
+    updateRescueRequest,
+    deleteRescueRequest
+
 } = require('../Controlers/RescueRequestController');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -53,5 +56,7 @@ router.get('/my-reports', authenticateToken, getMyRescueRequests);
 router.get('/:id', getRescueRequestById);
 router.put('/:id/status', authenticateToken, updateRescueRequestStatus);
 router.put('/:id/assign', authenticateToken, assignDriverToRequest);
+router.put('/:id', authenticateToken, updateRescueRequest);
+router.delete('/:id', authenticateToken, deleteRescueRequest);
 
 module.exports = router;

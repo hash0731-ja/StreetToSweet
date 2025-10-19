@@ -30,7 +30,9 @@ import {
   ClipboardList,
   Users,
   Eye,
-  Edit
+  Edit,
+  FileText,
+  Activity
 } from 'lucide-react';
 import './VolunteerDashboard.css';
 import VolunteerDashboardAPI from '../../api/volunteerDashboardAPI';
@@ -42,6 +44,7 @@ const VolunteerDashboard = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   
   // API instance
   const [api] = useState(() => new VolunteerDashboardAPI());
@@ -108,11 +111,72 @@ const VolunteerDashboard = () => {
     photos: []
   });
 
-  // Volunteer Management States (NEW)
+  // Volunteer Management States
   const [assignedDogs, setAssignedDogs] = useState([]);
   const [volunteerTasks, setVolunteerTasks] = useState([]);
   const [showTaskDetails, setShowTaskDetails] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  // NEW: Health Report View States
+  const [showHealthReportsModal, setShowHealthReportsModal] = useState(false);
+  const [selectedDogHealthReports, setSelectedDogHealthReports] = useState([]);
+  const [selectedDogForHealthReports, setSelectedDogForHealthReports] = useState(null);
+
+  // NEW: Quick Walk Log States
+  const [showQuickWalkModal, setShowQuickWalkModal] = useState(false);
+  const [selectedDogForWalk, setSelectedDogForWalk] = useState(null);
+  const [quickWalkLog, setQuickWalkLog] = useState({
+    distance: '',
+    duration: '',
+    activities: [],
+    walkDate: new Date().toISOString().split('T')[0],
+    walkTime: new Date().toTimeString().slice(0, 5),
+    route: '',
+    notes: '',
+    weather: '',
+    walkQuality: 'good',
+    dogBehavior: 'calm'
+  });
+
+
+  const [showWalkDetailsModal, setShowWalkDetailsModal] = useState(false);
+const [selectedWalk, setSelectedWalk] = useState(null);
+
+// Add this function to load walk details (add it with the other load functions)
+const loadWalkDetails = async (walkId) => {
+  try {
+    const response = await api.getWalkDetails(walkId);
+    return response.data;
+  } catch (error) {
+    console.error('Error loading walk details:', error);
+    return null;
+  }
+};
+
+const openWalkDetailsModal = async (walk) => {
+  setSelectedWalk(walk);
+  setShowWalkDetailsModal(true);
+};
+
+// Add this function to close walk details modal
+const closeWalkDetailsModal = () => {
+  setShowWalkDetailsModal(false);
+  setSelectedWalk(null);
+};
+
+// NEW: Recent Walks Modal States
+const [showRecentWalksModal, setShowRecentWalksModal] = useState(false);
+const [selectedDogRecentWalks, setSelectedDogRecentWalks] = useState([]);
+const [selectedDogForRecentWalks, setSelectedDogForRecentWalks] = useState(null);
+
+
+  // NEW: Walk Log Modal State
+  const [showWalkLogModal, setShowWalkLogModal] = useState(false);
+  const [selectedDogForWalkLog, setSelectedDogForWalkLog] = useState(null);
+
+  // Form validation states
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check if user is authenticated and load data if valid token exists
   useEffect(() => {
@@ -124,7 +188,7 @@ const VolunteerDashboard = () => {
       return;
     }
     loadDashboardData();
-    loadVolunteerManagementData(); // NEW: Load volunteer management data
+    loadVolunteerManagementData();
   }, []);
 
   const loadDashboardData = async () => {
@@ -172,20 +236,6 @@ const VolunteerDashboard = () => {
       // Load health reports
       const healthData = await api.getHealthReports();
       setHealthReports(healthData?.data?.reports || []);
-console.log('=== DASHBOARD DATA LOADED ===');
-    console.log('User Data:', overviewData?.data?.volunteerInfo);
-    console.log('Dashboard Data:', overviewData?.data);
-    console.log('Assigned Tasks:', tasksData?.data?.tasksByDog);
-    console.log('Available Dogs:', dogsData?.data?.dogs);
-    console.log('======================');
-
-
-      // Set sample notifications
-      setNotifications([
-        { id: 1, message: 'Your shift starts in 30 minutes', read: false, timestamp: '10 mins ago' },
-        { id: 2, message: 'Health report submitted successfully', read: false, timestamp: '45 mins ago' },
-        { id: 3, message: 'New blog post approved', read: true, timestamp: '2 hours ago' }
-      ]);
 
     } catch (error) {
       setError('Failed to load dashboard data: ' + (error.message || 'Unknown error'));
@@ -195,44 +245,320 @@ console.log('=== DASHBOARD DATA LOADED ===');
     }
   };
 
-  // NEW: Load volunteer management data
+  // Load volunteer management data
   const loadVolunteerManagementData = async () => {
-  try {
-    console.log('Loading volunteer management data...');
-    
-    // Load assigned dogs for this volunteer
-    const assignedDogsResponse = await api.getAssignedDogs();
-    console.log('Assigned dogs response:', assignedDogsResponse);
-    setAssignedDogs(assignedDogsResponse?.data || []);
+    try {
+      console.log('Loading volunteer management data...');
+      
+      // Load assigned dogs for this volunteer
+      const assignedDogsResponse = await api.getAssignedDogs();
+      console.log('Assigned dogs response:', assignedDogsResponse);
+      setAssignedDogs(assignedDogsResponse?.data || []);
 
-    // Fetch volunteer tasks
-    const tasksResponse = await api.getVolunteerTasks();
-    console.log('Volunteer tasks response:', tasksResponse);
-    setVolunteerTasks(tasksResponse?.data || []);
+      // Fetch volunteer tasks
+      const tasksResponse = await api.getVolunteerTasks();
+      console.log('Volunteer tasks response:', tasksResponse);
+      setVolunteerTasks(tasksResponse?.data || []);
 
-    // DEBUG: Check volunteer management data
-    console.log('Assigned Dogs:', assignedDogsResponse?.data);
-    console.log('Volunteer Tasks:', tasksResponse?.data);
-    console.log('==============================');
+    } catch (error) {
+      console.error('Error loading volunteer management data:', error);
+      
+      // Fallback: Try to get data from the dashboard overview
+      if (dashboardData?.assignedDogs) {
+        console.log('Using fallback data from dashboard');
+        setAssignedDogs(dashboardData.assignedDogs);
+      }
+      
+      // Set empty arrays as fallback
+      if (assignedDogs.length === 0) {
+        setAssignedDogs([]);
+      }
+      if (volunteerTasks.length === 0) {
+        setVolunteerTasks([]);
+      }
+    }
+  };
+
+  // Load health reports for a specific dog
+  const loadDogHealthReports = async (dogId) => {
+    try {
+      const allReports = healthReports.filter(report => getReportDogId(report) === dogId);
+      setSelectedDogHealthReports(allReports);
+    } catch (error) {
+      console.error('Error loading dog health reports:', error);
+      setSelectedDogHealthReports([]);
+    }
+  };
+
+  // Load recent walks for a specific dog
+  const loadDogRecentWalks = async (dogId) => {
+    try {
+      // Filter walks from walkingData for the specific dog
+      const allWalks = walkingData.walks || walkingData.recentWalks || [];
+      const dogWalks = allWalks.filter(walk => {
+        const walkDogId = walk.dogId?._id || walk.dogId || walk.dog?._id || walk.dog;
+        return walkDogId === dogId;
+      });
+      
+      // Sort by date, most recent first
+      const sortedWalks = dogWalks.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+      setSelectedDogRecentWalks(sortedWalks);
+    } catch (error) {
+      console.error('Error loading dog recent walks:', error);
+      setSelectedDogRecentWalks([]);
+    }
+  };
+
+  // Form validation functions
+  const validateHealthReport = (reportData) => {
+    const errors = {};
     
-  } catch (error) {
-    console.error('Error loading volunteer management data:', error);
-    
-    // Fallback: Try to get data from the dashboard overview
-    if (dashboardData?.assignedDogs) {
-       console.log('Using fallback data from dashboard');
-      setAssignedDogs(dashboardData.assignedDogs);
+    if (!reportData.dogId) {
+      errors.dogId = 'Please select a dog';
     }
     
-    // Set empty arrays as fallback
-    if (assignedDogs.length === 0) {
-      setAssignedDogs([]);
+    if (!reportData.eatingHabits) {
+      errors.eatingHabits = 'Please specify eating habits';
     }
-    if (volunteerTasks.length === 0) {
-      setVolunteerTasks([]);
+    
+    if (!reportData.mood) {
+      errors.mood = 'Please specify mood/behavior';
     }
-  }
-};
+    
+    if (reportData.weight && (parseFloat(reportData.weight) <= 0 || parseFloat(reportData.weight) > 100)) {
+      errors.weight = 'Please enter a valid weight (0.1 - 100 kg)';
+    }
+    
+    if (!reportData.observations || reportData.observations.trim().length < 10) {
+      errors.observations = 'Please provide detailed observations (minimum 10 characters)';
+    }
+    
+    return errors;
+  };
+
+  const validateWalkLog = (walkData) => {
+    const errors = {};
+    
+    if (!walkData.dogId) {
+      errors.dogId = 'Please select a dog';
+    }
+    
+    if (!walkData.distance || parseFloat(walkData.distance) <= 0) {
+      errors.distance = 'Please enter a valid distance (greater than 0 km)';
+    }
+    
+    if (!walkData.duration || parseInt(walkData.duration) <= 0) {
+      errors.duration = 'Please enter a valid duration (greater than 0 minutes)';
+    }
+    
+    if (!walkData.walkDate) {
+      errors.walkDate = 'Please select a date';
+    }
+    
+    if (!walkData.walkTime) {
+      errors.walkTime = 'Please select a time';
+    }
+    
+    if (walkData.activities.length === 0) {
+      errors.activities = 'Please select at least one activity';
+    }
+    
+    return errors;
+  };
+
+  const validateBlogPost = (postData) => {
+    const errors = {};
+    
+    if (!postData.title || postData.title.trim().length < 5) {
+      errors.title = 'Title must be at least 5 characters long';
+    }
+    
+    if (!postData.content || postData.content.trim().length < 50) {
+      errors.content = 'Content must be at least 50 characters long';
+    }
+    
+    return errors;
+  };
+
+  // Open health reports modal
+  const openHealthReportsModal = async (dog) => {
+    setSelectedDogForHealthReports(dog);
+    await loadDogHealthReports(dog._id);
+    setShowHealthReportsModal(true);
+  };
+
+  // Close health reports modal
+  const closeHealthReportsModal = () => {
+    setShowHealthReportsModal(false);
+    setSelectedDogForHealthReports(null);
+    setSelectedDogHealthReports([]);
+  };
+
+  // Open recent walks modal
+  const openRecentWalksModal = async (dog) => {
+    setSelectedDogForRecentWalks(dog);
+    await loadDogRecentWalks(dog._id);
+    setShowRecentWalksModal(true);
+  };
+
+  // Close recent walks modal
+  const closeRecentWalksModal = () => {
+    setShowRecentWalksModal(false);
+    setSelectedDogForRecentWalks(null);
+    setSelectedDogRecentWalks([]);
+  };
+
+  // Open quick walk modal
+  const openQuickWalkModal = (dog) => {
+    setSelectedDogForWalk(dog);
+    setQuickWalkLog({
+      distance: '',
+      duration: '',
+      activities: [],
+      walkDate: new Date().toISOString().split('T')[0],
+      walkTime: new Date().toTimeString().slice(0, 5),
+      route: '',
+      notes: '',
+      weather: '',
+      walkQuality: 'good',
+      dogBehavior: 'calm'
+    });
+    setShowQuickWalkModal(true);
+  };
+
+  // Close quick walk modal
+  const closeQuickWalkModal = () => {
+    setShowQuickWalkModal(false);
+    setSelectedDogForWalk(null);
+    setQuickWalkLog({
+      distance: '',
+      duration: '',
+      activities: [],
+      walkDate: new Date().toISOString().split('T')[0],
+      walkTime: new Date().toTimeString().slice(0, 5),
+      route: '',
+      notes: '',
+      weather: '',
+      walkQuality: 'good',
+      dogBehavior: 'calm'
+    });
+    setFormErrors({});
+  };
+
+  // NEW: Open walk log modal
+  const openWalkLogModal = (dog) => {
+    setSelectedDogForWalkLog(dog);
+    setWalkLog({
+      dogId: dog._id,
+      distance: '',
+      duration: '',
+      activities: [],
+      walkDate: new Date().toISOString().split('T')[0],
+      walkTime: new Date().toTimeString().slice(0, 5),
+      route: '',
+      notes: '',
+      weather: '',
+      walkQuality: 'good',
+      dogBehavior: 'calm',
+      startTime: '',
+      endTime: ''
+    });
+    setShowWalkLogModal(true);
+    setFormErrors({});
+  };
+
+  // NEW: Close walk log modal
+  const closeWalkLogModal = () => {
+    setShowWalkLogModal(false);
+    setSelectedDogForWalkLog(null);
+    setWalkLog({
+      dogId: '',
+      distance: '',
+      duration: '',
+      activities: [],
+      walkDate: new Date().toISOString().split('T')[0],
+      walkTime: new Date().toTimeString().slice(0, 5),
+      route: '',
+      notes: '',
+      weather: '',
+      walkQuality: 'good',
+      dogBehavior: 'calm',
+      startTime: '',
+      endTime: ''
+    });
+    setFormErrors({});
+  };
+
+  // Handle quick walk submission
+  const handleQuickWalkSubmit = async () => {
+    const errors = validateWalkLog({
+      ...quickWalkLog,
+      dogId: selectedDogForWalk?._id
+    });
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      if (!selectedDogForWalk) {
+        alert('No dog selected for walk');
+        return;
+      }
+
+      const walkData = {
+        dogId: selectedDogForWalk._id,
+        distance: parseFloat(quickWalkLog.distance),
+        duration: parseInt(quickWalkLog.duration),
+        activities: quickWalkLog.activities,
+        walkDate: quickWalkLog.walkDate,
+        walkTime: quickWalkLog.walkTime,
+        route: quickWalkLog.route || '',
+        notes: quickWalkLog.notes || '',
+        weather: quickWalkLog.weather || '',
+        walkQuality: quickWalkLog.walkQuality || 'good',
+        dogBehavior: quickWalkLog.dogBehavior || 'calm',
+        startTime: new Date(`${quickWalkLog.walkDate}T${quickWalkLog.walkTime}`).toISOString(),
+        endTime: new Date(new Date(`${quickWalkLog.walkDate}T${quickWalkLog.walkTime}`).getTime() + parseInt(quickWalkLog.duration) * 60000).toISOString()
+      };
+
+      const formData = api.createWalkFormData(walkData);
+      await api.logWalk(formData);
+      
+      // Close modal and reload data
+      closeQuickWalkModal();
+      
+      // Reload walking data
+      const walkDataUpdated = await api.getWalkingData();
+      setWalkingData(walkDataUpdated?.data || { 
+        walks: [], 
+        statistics: {},
+        totalDistance: 0,
+        totalDuration: '0h 0m',
+        uniqueDogs: 0,
+        recentWalks: []
+      });
+      
+      alert('Walk logged successfully!');
+    } catch (error) {
+      console.error('Error logging quick walk:', error);
+      let errorMessage = 'Failed to log walk';
+      if (error.response) {
+        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
+      } else if (error.request) {
+        errorMessage = 'Network error: Could not connect to server';
+      } else {
+        errorMessage = error.message || 'Unknown error occurred';
+      }
+      
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Handle window resize for responsive design
   useEffect(() => {
@@ -246,65 +572,67 @@ console.log('=== DASHBOARD DATA LOADED ===');
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Add this useEffect to monitor state changes
-useEffect(() => {
-  console.log('=== STATE UPDATES ===');
-  console.log('User Data:', userData);
-  console.log('Assigned Dogs:', assignedDogs);
-  console.log('Volunteer Tasks:', volunteerTasks);
-  console.log('Dashboard Data:', dashboardData);
-  console.log('=====================');
-}, [userData, assignedDogs, volunteerTasks, dashboardData]);
+  // Monitor state changes
+  useEffect(() => {
+    console.log('=== STATE UPDATES ===');
+    console.log('User Data:', userData);
+    console.log('Assigned Dogs:', assignedDogs);
+    console.log('Volunteer Tasks:', volunteerTasks);
+    console.log('Dashboard Data:', dashboardData);
+    console.log('=====================');
+  }, [userData, assignedDogs, volunteerTasks, dashboardData]);
 
   useEffect(() => {
-  const token = localStorage.getItem('authToken');
-  if (!token) {
-    console.log('No token found, user needs to login');
-    setError('Please login to access the volunteer dashboard.');
-    setLoading(false);
-    return;
-  }
-  loadDashboardData();
-}, []);
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.log('No token found, user needs to login');
+      setError('Please login to access the volunteer dashboard.');
+      setLoading(false);
+      return;
+    }
+    loadDashboardData();
+  }, []);
 
-// Load volunteer management data when dashboard data is loaded
-useEffect(() => {
-  if (dashboardData && userData) {
-    loadVolunteerManagementData();
-  }
-}, [dashboardData, userData]);
+  // Load volunteer management data when dashboard data is loaded
+  useEffect(() => {
+    if (dashboardData && userData) {
+      loadVolunteerManagementData();
+    }
+  }, [dashboardData, userData]);
 
-  // NEW: Task management functions
+  // Task management functions
   const handleViewTaskDetails = (task) => {
     setSelectedTask(task);
     setShowTaskDetails(true);
   };
 
   const handleUpdateTaskStatus = async (taskId, status) => {
-  try {
-    console.log('Updating task status:', taskId, status);
-    
-    const response = await api.updateTaskStatus(taskId, status);
-    console.log('Task status update response:', response);
-    
-    // Reload tasks
-    const tasksResponse = await api.getVolunteerTasks();
-    setVolunteerTasks(tasksResponse?.data || []);
-    
-    // Show success message
-    alert(`Task marked as ${status}`);
-    
-  } catch (error) {
-    console.error('Error updating task status:', error);
-    
-    let errorMessage = 'Failed to update task status';
-    if (error.response?.data?.message) {
-      errorMessage = error.response.data.message;
+    try {
+      console.log('Updating task status:', taskId, status);
+      
+      const response = await api.updateTaskStatus(taskId, status);
+      console.log('Task status update response:', response);
+      
+      // Reload tasks
+      const tasksResponse = await api.getVolunteerTasks();
+      setVolunteerTasks(tasksResponse?.data || []);
+      
+      // Show success message
+      alert(`Task marked as ${status}`);
+      
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      
+      let errorMessage = 'Failed to update task status';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      alert(errorMessage);
     }
-    
-    alert(errorMessage);
-  }
-};
+  };
+
+  
 
   const markNotificationRead = (id) => {
     setNotifications(notifications.map(notif => 
@@ -348,6 +676,8 @@ useEffect(() => {
     }
   };
 
+  
+
   // Open health report modal
   const openHealthReportModal = (dog) => {
     setSelectedDogForModal(dog);
@@ -360,6 +690,7 @@ useEffect(() => {
       photos: []
     });
     setShowHealthReportModal(true);
+    setFormErrors({});
   };
 
   // Close health report modal
@@ -374,11 +705,20 @@ useEffect(() => {
       observations: '',
       photos: []
     });
+    setFormErrors({});
   };
 
   // Handle health report submission from modal
   const handleModalHealthReportSubmit = async () => {
+    const errors = validateHealthReport(modalHealthReport);
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       if (!modalHealthReport.dogId) {
         alert('Please select a dog');
         return;
@@ -400,13 +740,23 @@ useEffect(() => {
     } catch (error) {
       console.error('Error submitting health report:', error);
       setError('Failed to submit health report');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Original health report handler (kept for compatibility)
+  // Original health report handler
   const handleHealthReportSubmit = async (dogId, reportData = null) => {
+    const data = reportData || healthReport;
+    const errors = validateHealthReport(data);
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     try {
-      const data = reportData || healthReport;
+      setIsSubmitting(true);
       const finalData = { ...data };
       
       if (!finalData.dogId && dogId) {
@@ -441,11 +791,21 @@ useEffect(() => {
     } catch (error) {
       console.error('Error submitting health report:', error);
       setError('Failed to submit health report');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleNewBlogPost = async () => {
+    const errors = validateBlogPost(newBlogPost);
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       if (!newBlogPost.title || !newBlogPost.content) {
         alert('Please fill in both title and content');
         return;
@@ -469,33 +829,23 @@ useEffect(() => {
     } catch (error) {
       console.error('Error creating blog post:', error);
       setError('Failed to create blog post');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleWalkLog = async () => {
+    const errors = validateWalkLog(walkLog);
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       if (!walkLog.dogId) {
         alert('Please select a dog');
-        return;
-      }
-      if (!walkLog.distance || parseFloat(walkLog.distance) <= 0) {
-        alert('Please enter a valid distance (greater than 0 km)');
-        return;
-      }
-      if (!walkLog.duration || parseInt(walkLog.duration) <= 0) {
-        alert('Please enter a valid duration (greater than 0 minutes)');
-        return;
-      }
-      if (!walkLog.walkDate) {
-        alert('Please select a date');
-        return;
-      }
-      if (!walkLog.walkTime) {
-        alert('Please select a time');
-        return;
-      }
-      if (walkLog.activities.length === 0) {
-        alert('Please select at least one activity');
         return;
       }
 
@@ -575,6 +925,8 @@ useEffect(() => {
       
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -640,6 +992,108 @@ useEffect(() => {
     }
   };
 
+  // Update the handleDeleteHealthReport function
+const handleDeleteHealthReport = async (reportId) => {
+  try {
+    if (window.confirm('Are you sure you want to delete this health report? This action cannot be undone.')) {
+      await api.deleteHealthReport(reportId);
+      
+      // Remove from local state immediately for better UX
+      setHealthReports(prevReports => prevReports.filter(report => report._id !== reportId));
+      setSelectedDogHealthReports(prevReports => prevReports.filter(report => report._id !== reportId));
+      
+      // Reload health reports to ensure consistency
+      const healthData = await api.getHealthReports();
+      setHealthReports(healthData?.data?.reports || []);
+      
+      alert('Health report deleted successfully!');
+    }
+  } catch (error) {
+    console.error('Error deleting health report:', error);
+    let errorMessage = 'Failed to delete health report';
+    
+    if (error.message) {
+      if (error.message.includes('not found')) {
+        errorMessage = 'Health report not found or already deleted';
+      } else if (error.message.includes('permission')) {
+        errorMessage = 'You do not have permission to delete this health report';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    alert(errorMessage);
+    
+    // Reload health reports to ensure consistency
+    try {
+      const healthData = await api.getHealthReports();
+      setHealthReports(healthData?.data?.reports || []);
+    } catch (reloadError) {
+      console.error('Failed to reload health reports:', reloadError);
+    }
+  }
+};
+
+// Update the handleDeleteWalkLog function
+const handleDeleteWalkLog = async (walkId) => {
+  try {
+    if (window.confirm('Are you sure you want to delete this walk log? This action cannot be undone.')) {
+      await api.deleteWalkLog(walkId);
+      
+      // Remove from local state immediately for better UX
+      setWalkingData(prevData => ({
+        ...prevData,
+        walks: (prevData.walks || []).filter(walk => walk._id !== walkId),
+        recentWalks: (prevData.recentWalks || []).filter(walk => walk._id !== walkId)
+      }));
+      setSelectedDogRecentWalks(prevWalks => prevWalks.filter(walk => walk._id !== walkId));
+      
+      // Reload walking data to ensure consistency
+      const walkDataUpdated = await api.getWalkingData();
+      setWalkingData(walkDataUpdated?.data || { 
+        walks: [], 
+        statistics: {},
+        totalDistance: 0,
+        totalDuration: '0h 0m',
+        uniqueDogs: 0,
+        recentWalks: []
+      });
+      
+      alert('Walk log deleted successfully!');
+    }
+  } catch (error) {
+    console.error('Error deleting walk log:', error);
+    let errorMessage = 'Failed to delete walk log';
+    
+    if (error.message) {
+      if (error.message.includes('not found')) {
+        errorMessage = 'Walk log not found or already deleted';
+      } else if (error.message.includes('permission')) {
+        errorMessage = 'You do not have permission to delete this walk log';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    alert(errorMessage);
+    
+    // Reload walking data to ensure consistency
+    try {
+      const walkDataUpdated = await api.getWalkingData();
+      setWalkingData(walkDataUpdated?.data || { 
+        walks: [], 
+        statistics: {},
+        totalDistance: 0,
+        totalDuration: '0h 0m',
+        uniqueDogs: 0,
+        recentWalks: []
+      });
+    } catch (reloadError) {
+      console.error('Failed to reload walking data:', reloadError);
+    }
+  }
+};
+
   const calculateTotalTime = (currentTime, newDuration) => {
     try {
       const [currentHours, currentMins] = currentTime.split('h ');
@@ -681,402 +1135,1017 @@ useEffect(() => {
     alert('Downloading volunteer report...');
   };
 
-  // NEW: Render Volunteer Management Section
-  const renderVolunteerManagement = () => {
-    return(
+  // Calculate assigned dogs health reports count
+  const getAssignedDogsHealthReportsCount = () => {
+    if (!assignedDogs.length || !healthReports.length) return 0;
     
-    <section className="v-dash-section">
-      <div className="v-dash-section-header">
-        <h2 style={{ 
-          fontSize: '2rem', 
-          fontWeight: '700', 
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          marginBottom: '8px'
-        }}>
-          👥 Volunteer Management
-        </h2>
-        <p style={{ 
-          fontSize: '1.1rem', 
-          color: '#64748b',
-          fontWeight: '400'
-        }}>
-          Manage your assigned dogs and tasks
-        </p>
-      </div>
+    let count = 0;
+    assignedDogs.forEach(assignment => {
+      const dog = assignment.dogId || assignment;
+      const dogReports = healthReports.filter(report => getReportDogId(report) === dog._id);
+      count += dogReports.length;
+    });
+    
+    return count;
+  };
 
-      {/* Assigned Dogs Section */}
-      <div style={{ marginBottom: '32px' }}>
-        <h3 style={{ 
-          fontSize: '1.5rem', 
-          fontWeight: '600',
-          color: '#1f2937',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <PawPrint size={24} />
-          Your Assigned Dogs
-        </h3>
+  // Calculate total volunteer hours from walks and tasks
+  const calculateTotalVolunteerHours = () => {
+    let totalHours = 0;
+    
+    // Calculate hours from walks
+    const allWalks = walkingData.walks || walkingData.recentWalks || [];
+    allWalks.forEach(walk => {
+      if (walk.duration) {
+        // Parse duration - could be in format like "30m", "1h", "1h 30m", etc.
+        const duration = walk.duration.toString();
         
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-          gap: '20px'
-        }}>
-          {assignedDogs.length > 0 ? assignedDogs.map((assignment) => (
+        // Handle different duration formats
+        if (duration.includes('h') || duration.includes('m')) {
+          // Format like "1h 30m"
+          const hoursMatch = duration.match(/(\d+)h/);
+          const minutesMatch = duration.match(/(\d+)m/);
+          
+          const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
+          const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 0;
+          
+          totalHours += hours + (minutes / 60);
+        } else {
+          // Assume it's just minutes
+          totalHours += parseInt(duration) / 60;
+        }
+      }
+    });
+    
+    // Add hours from completed tasks (assuming each task takes some time)
+    const completedTasks = volunteerTasks.filter(task => task.status === 'completed');
+    totalHours += completedTasks.length * 0.5; // Assume 30 minutes per task
+    
+    return Math.round(totalHours * 10) / 10; // Round to 1 decimal place
+  };
+
+  // Enhanced Statistics Display Component
+  const StatisticsDisplay = () => {
+    const totalVolunteerHours = calculateTotalVolunteerHours();
+    const completedTasksCount = volunteerTasks.filter(task => task.status === 'completed').length;
+    const totalDistance = dashboardData?.statistics?.totalDistance?.toFixed(1) || walkingData?.totalDistance?.toFixed(1) || 0;
+    
+    const stats = [
+      {
+        label: 'Total Volunteered',
+        value: totalVolunteerHours,
+        unit: 'hours',
+        icon: <Clock size={24} />,
+        color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      },
+      {
+        label: 'Under Your Care',
+        value: assignedDogs.length || 0,
+        unit: 'dogs',
+        icon: <PawPrint size={24} />,
+        color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+      },
+      {
+        label: 'Completed This Month',
+        value: completedTasksCount,
+        unit: 'tasks',
+        icon: <CheckCircle size={24} />,
+        color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+      },
+      {
+        label: 'Total Walked',
+        value: totalDistance,
+        unit: 'km',
+        icon: <TrendingUp size={24} />,
+        color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+      }
+    ];
+
+    return (
+      <div className="v-dash-stats-grid-enhanced">
+        {stats.map((stat, index) => (
+          <div key={index} className="v-dash-stat-card-enhanced">
             <div 
-              key={assignment.dogId?._id || assignment._id}
-              style={{
-                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '16px',
-                padding: '20px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.8)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
-              }}
+              className="v-dash-stat-icon-enhanced"
+              style={{ background: stat.color }}
             >
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '16px',
-                marginBottom: '16px'
-              }}>
-                <img 
-                  src={assignment.dogId?.photo ? `http://localhost:3000/uploads/dogs/${assignment.dogId.photo}` : 'https://placedog.net/300/300?id=1'} 
-                  alt={assignment.dogId?.name}
-                  style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '3px solid #ffffff',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+              {stat.icon}
+            </div>
+            <div className="v-dash-stat-info-enhanced">
+              <h3>{stat.value}</h3>
+              <p>{stat.label}</p>
+              <span className="v-dash-stat-unit">{stat.unit}</span>
+            </div>
+            <div className="v-dash-stat-progress">
+              <div 
+                className="v-dash-progress-bar"
+                style={{ 
+                  width: `${Math.min((stat.value / (stat.unit === 'hours' ? 100 : stat.unit === 'dogs' ? 10 : stat.unit === 'tasks' ? 50 : 100)) * 100, 100)}%`,
+                  background: stat.color
+                }}
+              ></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Activity Chart Component
+  const ActivityChart = () => {
+    const activities = [
+      { name: 'Health Reports', count: getAssignedDogsHealthReportsCount(), color: '#3b82f6' },
+      { name: 'Blog Posts', count: blogPosts.length, color: '#10b981' },
+      { name: 'Walks Logged', count: walkingData?.statistics?.totalWalks || walkingData?.walks?.length || 0, color: '#f59e0b' }
+    ];
+
+    return (
+      <div className="v-dash-activity-chart">
+        <h3>Your Activity Overview</h3>
+        <div className="v-dash-chart-container">
+          {activities.map((activity, index) => (
+            <div key={index} className="v-dash-chart-item">
+              <div className="v-dash-chart-bar-container">
+                <div 
+                  className="v-dash-chart-bar"
+                  style={{ 
+                    height: `${Math.min((activity.count / 20) * 100, 100)}%`,
+                    backgroundColor: activity.color
                   }}
-                />
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ 
-                    fontSize: '1.25rem', 
-                    fontWeight: '700',
-                    color: '#1f2937',
-                    margin: '0 0 4px 0'
-                  }}>
-                    {assignment.dogId?.name}
-                  </h4>
-                  <p style={{ 
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    margin: '0'
-                  }}>
-                    {assignment.dogId?.breed || 'Mixed Breed'}
-                  </p>
+                ></div>
+              </div>
+              <div className="v-dash-chart-label">
+                <span>{activity.name}</span>
+                <strong>{activity.count}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Recent Activity Component
+  const RecentActivity = () => {
+    const recentActivities = [
+      ...(walkingData?.recentWalks?.slice(0, 3).map(walk => ({
+        type: 'walk',
+        title: `Walked ${walk.dog?.name || 'a dog'}`,
+        description: `${typeof walk.distance === 'number' ? walk.distance.toFixed(1) : walk.distance} km • ${walk.duration}`,
+        
+        icon: <MapPin size={16} />,
+        color: '#10b981'
+      })) || []),
+      ...(healthReports.slice(0, 2).map(report => ({
+        type: 'health',
+        title: 'Health Report Submitted',
+        description: `For ${report.dogId?.name || 'a dog'}`,
+        time: new Date(report.date || report.createdAt).toLocaleDateString(),
+        icon: <Heart size={16} />,
+        color: '#3b82f6'
+      }))),
+      ...(blogPosts.slice(0, 2).map(post => ({
+        type: 'blog',
+        title: 'Blog Post Created',
+        description: post.title,
+        time: new Date(post.createdAt).toLocaleDateString(),
+        icon: <Edit3 size={16} />,
+        color: '#f59e0b'
+      })))
+    ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 5);
+
+    return (
+      <div className="v-dash-recent-activity">
+        <h3>Recent Activity</h3>
+        <div className="v-dash-activity-list">
+          {recentActivities.length > 0 ? (
+            recentActivities.map((activity, index) => (
+              <div key={index} className="v-dash-activity-item">
+                <div 
+                  className="v-dash-activity-icon"
+                  style={{ backgroundColor: activity.color }}
+                >
+                  {activity.icon}
+                </div>
+                <div className="v-dash-activity-content">
+                  <h4>{activity.title}</h4>
+                  <p>{activity.description}</p>
+                  <span className="v-dash-activity-time">{activity.time}</span>
                 </div>
               </div>
-              
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <span style={{
-                  padding: '4px 12px',
-                  backgroundColor: '#dbeafe',
-                  color: '#3b82f6',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600'
-                }}>
-                  Assigned
-                </span>
-                <button 
-                  onClick={() => openHealthReportModal(assignment.dogId)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
-                >
-                  Health Report
-                </button>
-              </div>
-            </div>
-          )) : (
-            <div style={{
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '16px',
-              padding: '40px 20px',
-              textAlign: 'center',
-              border: '2px dashed #e5e7eb'
-            }}>
-              <PawPrint size={48} color="#9ca3af" />
-              <h4 style={{ 
-                fontSize: '1.125rem', 
-                fontWeight: '600',
-                color: '#6b7280',
-                margin: '16px 0 8px 0'
-              }}>
-                No Dogs Assigned
-              </h4>
-              <p style={{ 
-                fontSize: '0.875rem',
-                color: '#9ca3af',
-                margin: '0'
-              }}>
-                You haven't been assigned any dogs yet.
-              </p>
-            </div>
+            ))
+          ) : (
+            <p className="v-dash-no-activity">No recent activity to display</p>
           )}
         </div>
       </div>
+    );
+  };
 
-      {/* Tasks Section */}
-      <div>
-        <h3 style={{ 
-          fontSize: '1.5rem', 
-          fontWeight: '600',
-          color: '#1f2937',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <ClipboardList size={24} />
-          Your Tasks
-        </h3>
-        
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
-          gap: '20px'
-        }}>
-          {volunteerTasks.length > 0 ? volunteerTasks.map((task) => (
-            <div 
-              key={task._id}
-              style={{
-                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '16px',
-                padding: '20px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.8)',
-                transition: 'all 0.3s ease',
-                borderLeft: `4px solid ${
-                  task.status === 'completed' ? '#10b981' : 
-                  task.status === 'in-progress' ? '#3b82f6' : 
-                  '#f59e0b'
-                }`
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
-              }}
+  // Render Health Reports Modal
+  const renderHealthReportsModal = () => (
+    showHealthReportsModal && selectedDogForHealthReports && (
+      <div className="v-dash-modal-overlay">
+        <div className="v-dash-modal" style={{ maxWidth: '800px', maxHeight: '90vh' }}>
+          <div className="v-dash-modal-header">
+            <h3>Health Reports for {selectedDogForHealthReports.name}</h3>
+            <button 
+              className="v-dash-modal-close"
+              onClick={closeHealthReportsModal}
             >
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '12px'
-              }}>
-                <h4 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  margin: '0'
-                }}>
-                  {task.taskType}
-                </h4>
-                <span style={{
-                  padding: '4px 12px',
-                  backgroundColor: 
-                    task.status === 'completed' ? '#dcfce7' : 
-                    task.status === 'in-progress' ? '#dbeafe' : 
-                    '#fef3c7',
-                  color: 
-                    task.status === 'completed' ? '#166534' : 
-                    task.status === 'in-progress' ? '#1e40af' : 
-                    '#92400e',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  textTransform: 'capitalize'
-                }}>
-                  {task.status}
-                </span>
-              </div>
-              
-              {task.taskDescription && (
-                <p style={{ 
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  marginBottom: '12px',
-                  lineHeight: '1.4'
-                }}>
-                  {task.taskDescription}
-                </p>
-              )}
-              
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-              }}>
-                <div>
-                  <p style={{ 
-                    fontSize: '0.75rem',
-                    color: '#9ca3af',
-                    margin: '0 0 4px 0'
-                  }}>
-                    Scheduled
-                  </p>
-                  <p style={{ 
-                    fontSize: '0.875rem',
-                    color: '#374151',
-                    margin: '0',
-                    fontWeight: '500'
-                  }}>
-                    {task.scheduledTime ? new Date(task.scheduledTime).toLocaleString() : 'Not scheduled'}
-                  </p>
-                </div>
-                
-                {task.priority && (
-                  <div>
-                    <p style={{ 
-                      fontSize: '0.75rem',
-                      color: '#9ca3af',
-                      margin: '0 0 4px 0',
-                      textAlign: 'right'
-                    }}>
-                      Priority
-                    </p>
-                    <span style={{
-                      padding: '2px 8px',
-                      backgroundColor: 
-                        task.priority === 'high' ? '#fef2f2' : 
-                        task.priority === 'medium' ? '#fffbeb' : 
-                        '#f0fdf4',
-                      color: 
-                        task.priority === 'high' ? '#dc2626' : 
-                        task.priority === 'medium' ? '#d97706' : 
-                        '#16a34a',
-                      borderRadius: '8px',
-                      fontSize: '0.7rem',
-                      fontWeight: '600',
-                      textTransform: 'capitalize'
-                    }}>
-                      {task.priority}
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px',
-                justifyContent: 'flex-end'
-              }}>
-                <button 
-                  onClick={() => handleViewTaskDetails(task)}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: 'transparent',
-                    color: '#6b7280',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f9fafb';
-                    e.target.style.color = '#374151';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                    e.target.style.color = '#6b7280';
-                  }}
-                >
-                  <Eye size={12} style={{ marginRight: '4px' }} />
-                  Details
-                </button>
-                
-                {task.status !== 'completed' && (
-                  <button 
-                    onClick={() => handleUpdateTaskStatus(task._id, 'completed')}
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="v-dash-modal-content" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {selectedDogHealthReports.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {selectedDogHealthReports
+                  .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
+                  .map((report, index) => (
+                  <div 
+                    key={report._id || index}
                     style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      padding: '16px',
+                      border: '1px solid #c58d16ff',
+                      borderRadius: '12px',
+                      backgroundColor: '#fcfaf5ff',
+                      position: 'relative'
                     }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
                   >
-                    Complete
-                  </button>
-                )}
+                    {/* Delete Button */}
+                    <button 
+                      onClick={() => handleDeleteHealthReport(report._id)}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        width: '28px',
+                        height: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                      title="Delete this health report"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '12px',
+                      paddingRight: '40px'
+                    }}>
+                      <h4 style={{ 
+                        fontSize: '1.1rem', 
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        margin: 0
+                      }}>
+                        Report from {new Date(report.date || report.createdAt).toLocaleDateString()}
+                      </h4>
+                      <span style={{
+                        padding: '4px 8px',
+                        backgroundColor: '#dbeafe',
+                        color: '#3b82f6',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}>
+                        {report.status || 'Submitted'}
+                      </span>
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px',
+                      marginBottom: '12px'
+                    }}>
+                      <div>
+                        <strong style={{ color: '#0f958aff', fontSize: '0.875rem' }}>Eating Habits:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#1f2937' }}>
+                          {report.eatingHabits || 'Not specified'}
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <strong style={{ color: '#0f958aff', fontSize: '0.875rem' }}>Mood:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#1f2937' }}>
+                          {report.mood || 'Not specified'}
+                        </p>
+                      </div>
+                      
+                      {report.weight && (
+                        <div>
+                          <strong style={{ color: '#0f958aff', fontSize: '0.875rem' }}>Weight:</strong>
+                          <p style={{ margin: '4px 0 0 0', color: '#1f2937' }}>
+                            {report.weight} kg
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {report.observations && (
+                      <div>
+                        <strong style={{ color: '#0f958aff', fontSize: '0.875rem' }}>Observations:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#1f2937', lineHeight: '1.5' }}>
+                          {report.observations}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {report.photos && report.photos.length > 0 && (
+                      <div style={{ marginTop: '12px' }}>
+                        <strong style={{ color: '#0f958aff', fontSize: '0.875rem' }}>Photos:</strong>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                          {report.photos.map((photo, photoIndex) => (
+                            <img 
+                              key={photoIndex}
+                              src={typeof photo === 'string' ? `http://localhost:3000/uploads/health-reports/${photo}` : URL.createObjectURL(photo)}
+                              alt={`Health report ${index + 1}`}
+                              style={{
+                                width: '80px',
+                                height: '80px',
+                                objectFit: 'cover',
+                                borderRadius: '8px',
+                                border: '1px solid #1e714aff'
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            </div>
-          )) : (
-            <div style={{
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '16px',
-              padding: '40px 20px',
-              textAlign: 'center',
-              border: '2px dashed #e5e7eb'
-            }}>
-              <ClipboardList size={48} color="#9ca3af" />
-              <h4 style={{ 
-                fontSize: '1.125rem', 
-                fontWeight: '600',
-                color: '#6b7280',
-                margin: '16px 0 8px 0'
+            ) : (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px 20px',
+                color: '#0f958aff'
               }}>
-                No Tasks Assigned
-              </h4>
-              <p style={{ 
-                fontSize: '0.875rem',
-                color: '#9ca3af',
-                margin: '0'
-              }}>
-                You don't have any tasks assigned at the moment.
-              </p>
-            </div>
-          )}
+                <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                <h4 style={{ margin: '0 0 8px 0', color: '#0f958aff' }}>No Health Reports</h4>
+                <p style={{ margin: 0 }}>No health reports have been submitted for this dog yet.</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="v-dash-modal-actions">
+            <button 
+              className="v-dash-secondary-btn"
+              onClick={closeHealthReportsModal}
+            >
+              Close
+            </button>
+            <button 
+              className="v-dash-primary-btn"
+              onClick={() => {
+                closeHealthReportsModal();
+                openHealthReportModal(selectedDogForHealthReports);
+              }}
+            >
+              Submit New Report
+            </button>
+          </div>
         </div>
       </div>
-    </section>
+    )
   );
-};
 
-  // NEW: Task Details Modal
+  // Render Recent Walks Modal
+  const renderRecentWalksModal = () => (
+    showRecentWalksModal && selectedDogForRecentWalks && (
+      <div className="v-dash-modal-overlay">
+        <div className="v-dash-modal" style={{ maxWidth: '800px', maxHeight: '90vh' }}>
+          <div className="v-dash-modal-header">
+            <h3>Recent Walks for {selectedDogForRecentWalks.name}</h3>
+            <button 
+              className="v-dash-modal-close"
+              onClick={closeRecentWalksModal}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="v-dash-modal-content" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {selectedDogRecentWalks.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {selectedDogRecentWalks.map((walk, index) => (
+                  <div 
+                    key={walk._id || index}
+                    style={{
+                      padding: '16px',
+                      border: '1px solid #083d83ff',
+                      borderRadius: '12px',
+                      backgroundColor: '#f0f7feff',
+                      position: 'relative'
+                    }}
+                  >
+                    {/* Delete Button */}
+                    <button 
+                      onClick={() => handleDeleteWalkLog(walk._id)}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        width: '28px',
+                        height: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                      title="Delete this walk log"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '12px',
+                      paddingRight: '40px'
+                    }}>
+                      <h4 style={{ 
+                        fontSize: '1.1rem', 
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        margin: 0
+                      }}>
+                        Walk on {new Date(walk.date || walk.createdAt).toLocaleDateString()}
+                      </h4>
+                      <span style={{
+                        padding: '4px 8px',
+                        backgroundColor: '#dcfce7',
+                        color: '#163065ff',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}>
+                        {typeof walk.distance === 'number' ? walk.distance.toFixed(1) : walk.distance} km
+                      </span>
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px',
+                      marginBottom: '12px'
+                    }}>
+                      <div>
+                        <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Duration:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#1f2937' }}>
+                          {walk.duration || 'Not specified'}
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Route:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#1f2937' }}>
+                          {walk.route || 'Not specified'}
+                        </p>
+                      </div>
+                      
+                      {walk.weather && (
+                        <div>
+                          <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Weather:</strong>
+                          <p style={{ margin: '4px 0 0 0', color: '#1f2937' }}>
+                            {walk.weather}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {walk.walkQuality && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Walk Quality:</strong>
+                        <span style={{
+                          marginLeft: '8px',
+                          padding: '2px 6px',
+                          backgroundColor: 
+                            walk.walkQuality === 'excellent' ? '#dcfce7' : 
+                            walk.walkQuality === 'good' ? '#dbeafe' : 
+                            walk.walkQuality === 'fair' ? '#fef3c7' : 
+                            '#fef2f2',
+                          color: 
+                            walk.walkQuality === 'excellent' ? '#166534' : 
+                            walk.walkQuality === 'good' ? '#1e40af' : 
+                            walk.walkQuality === 'fair' ? '#92400e' : 
+                            '#dc2626',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          textTransform: 'capitalize'
+                        }}>
+                          {walk.walkQuality}
+                        </span>
+                      </div>
+                    )}
+                    <br></br>
+
+                    {walk.dogBehavior && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Dog Behavior:</strong>
+                        <span style={{
+                          marginLeft: '8px',
+                          padding: '2px 6px',
+                          backgroundColor: '#f3e8ff',
+                          color: '#7c3aed',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          textTransform: 'capitalize'
+                        }}>
+                          {walk.dogBehavior}
+                        </span>
+                      </div>
+                    )}
+                    <br></br>
+
+                    {walk.activities && walk.activities.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Activities:</strong>
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {walk.activities.map((activity, activityIndex) => (
+                            <span 
+                              key={activityIndex}
+                              style={{
+                                padding: '2px 6px',
+                                backgroundColor: '#e0f2fe',
+                                color: '#0369a1',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: '500'
+                              }}
+                            >
+                              {activity}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}<br></br>
+                    
+                    {walk.notes && (
+                      <div>
+                        <strong style={{ color: '#158d7dff', fontSize: '0.875rem' }}>Notes:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#1f2937', lineHeight: '1.5' }}>
+                          {walk.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px 20px',
+                color: '#64748b'
+              }}>
+                <MapPin size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                <h4 style={{ margin: '0 0 8px 0', color: '#64748b' }}>No Recent Walks</h4>
+                <p style={{ margin: 0 }}>No walks have been logged for this dog yet.</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="v-dash-modal-actions">
+            <button 
+              className="v-dash-secondary-btn"
+              onClick={closeRecentWalksModal}
+            >
+              Close
+            </button>
+            <button 
+              className="v-dash-primary-btn"
+              onClick={() => {
+                closeRecentWalksModal();
+                openWalkLogModal(selectedDogForRecentWalks);
+              }}
+            >
+              Log New Walk
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  );
+
+  // Render Quick Walk Modal
+  const renderQuickWalkModal = () => (
+    showQuickWalkModal && selectedDogForWalk && (
+      <div className="v-dash-modal-overlay">
+        <div className="v-dash-modal" style={{ maxWidth: '600px' }}>
+          <div className="v-dash-modal-header">
+            <h3>Log Walk for {selectedDogForWalk.name}</h3>
+            <button 
+              className="v-dash-modal-close"
+              onClick={closeQuickWalkModal}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="v-dash-modal-content">
+            <div className="v-dash-modal-dog-info">
+              <img 
+                src={selectedDogForWalk.photo ? `http://localhost:3000/uploads/dogs/${selectedDogForWalk.photo}` : 'https://placedog.net/300/300?id=1'} 
+                alt={selectedDogForWalk.name}
+              />
+              <div>
+                <h4>{selectedDogForWalk.name}</h4>
+                <p>{selectedDogForWalk.breed || 'Mixed Breed'} • {selectedDogForWalk.age || 'Unknown age'}</p>
+              </div>
+            </div>
+            
+            <div className="v-dash-form-row">
+              <div className="v-dash-form-group">
+                <label>Date</label>
+                <input 
+                  type="date" 
+                  value={quickWalkLog.walkDate}
+                  onChange={(e) => setQuickWalkLog({...quickWalkLog, walkDate: e.target.value})}
+                />
+                {formErrors.walkDate && <span className="v-dash-form-error">{formErrors.walkDate}</span>}
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Time</label>
+                <input 
+                  type="time" 
+                  value={quickWalkLog.walkTime}
+                  onChange={(e) => setQuickWalkLog({...quickWalkLog, walkTime: e.target.value})}
+                />
+                {formErrors.walkTime && <span className="v-dash-form-error">{formErrors.walkTime}</span>}
+              </div>
+            </div>
+            
+            <div className="v-dash-form-row">
+              <div className="v-dash-form-group">
+                <label>Distance (km)</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  value={quickWalkLog.distance}
+                  onChange={(e) => setQuickWalkLog({...quickWalkLog, distance: e.target.value})}
+                  placeholder="0.0"
+                />
+                {formErrors.distance && <span className="v-dash-form-error">{formErrors.distance}</span>}
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Duration (minutes)</label>
+                <input 
+                  type="number" 
+                  value={quickWalkLog.duration}
+                  onChange={(e) => setQuickWalkLog({...quickWalkLog, duration: e.target.value})}
+                  placeholder="30"
+                />
+                {formErrors.duration && <span className="v-dash-form-error">{formErrors.duration}</span>}
+              </div>
+            </div>
+
+            <div className="v-dash-form-group">
+              <label>Route/Location</label>
+              <input 
+                type="text" 
+                value={quickWalkLog.route}
+                onChange={(e) => setQuickWalkLog({...quickWalkLog, route: e.target.value})}
+                placeholder="e.g., Park trail, neighborhood streets..."
+              />
+            </div>
+
+            <div className="v-dash-form-group">
+              <label>Activities</label>
+              {formErrors.activities && <span className="v-dash-form-error">{formErrors.activities}</span>}
+              <div className="v-dash-checkbox-group">
+                <label className="v-dash-checkbox-item">
+                  <input 
+                    type="checkbox" 
+                    checked={quickWalkLog.activities.includes('exercise')}
+                    onChange={(e) => {
+                      const activities = [...quickWalkLog.activities];
+                      if (e.target.checked) {
+                        activities.push('exercise');
+                      } else {
+                        const index = activities.indexOf('exercise');
+                        if (index > -1) activities.splice(index, 1);
+                      }
+                      setQuickWalkLog({...quickWalkLog, activities});
+                    }}
+                  />
+                  <span>Exercise</span>
+                </label>
+                
+                <label className="v-dash-checkbox-item">
+                  <input 
+                    type="checkbox" 
+                    checked={quickWalkLog.activities.includes('play')}
+                    onChange={(e) => {
+                      const activities = [...quickWalkLog.activities];
+                      if (e.target.checked) {
+                        activities.push('play');
+                      } else {
+                        const index = activities.indexOf('play');
+                        if (index > -1) activities.splice(index, 1);
+                      }
+                      setQuickWalkLog({...quickWalkLog, activities});
+                    }}
+                  />
+                  <span>Play</span>
+                </label>
+                
+                <label className="v-dash-checkbox-item">
+                  <input 
+                    type="checkbox" 
+                    checked={quickWalkLog.activities.includes('training')}
+                    onChange={(e) => {
+                      const activities = [...quickWalkLog.activities];
+                      if (e.target.checked) {
+                        activities.push('training');
+                      } else {
+                        const index = activities.indexOf('training');
+                        if (index > -1) activities.splice(index, 1);
+                      }
+                      setQuickWalkLog({...quickWalkLog, activities});
+                    }}
+                  />
+                  <span>Training</span>
+                </label>
+              </div>
+            </div>
+            
+            <div className="v-dash-form-group">
+              <label>Notes</label>
+              <textarea 
+                value={quickWalkLog.notes}
+                onChange={(e) => setQuickWalkLog({...quickWalkLog, notes: e.target.value})}
+                placeholder="Any observations during the walk..."
+                rows="3"
+              ></textarea>
+            </div>
+          </div>
+          
+          <div className="v-dash-modal-actions">
+            <button 
+              className="v-dash-secondary-btn"
+              onClick={closeQuickWalkModal}
+            >
+              Cancel
+            </button>
+            <button 
+              className="v-dash-primary-btn"
+              onClick={handleQuickWalkSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Logging...' : 'Log Walk'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  );
+
+  // NEW: Render Walk Log Modal
+  const renderWalkLogModal = () => (
+    showWalkLogModal && selectedDogForWalkLog && (
+      <div className="v-dash-modal-overlay">
+        <div className="v-dash-modal" style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="v-dash-modal-header">
+            <h3>Log Walk for {selectedDogForWalkLog.name}</h3>
+            <button 
+              className="v-dash-modal-close"
+              onClick={closeWalkLogModal}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="v-dash-modal-content">
+            <div className="v-dash-modal-dog-info">
+              <img 
+                src={selectedDogForWalkLog.photo ? `http://localhost:3000/uploads/dogs/${selectedDogForWalkLog.photo}` : 'https://placedog.net/300/300?id=1'} 
+                alt={selectedDogForWalkLog.name}
+              />
+              <div>
+                <h4>{selectedDogForWalkLog.name}</h4>
+                <p>{selectedDogForWalkLog.breed || 'Mixed Breed'} • {selectedDogForWalkLog.age || 'Unknown age'}</p>
+              </div>
+            </div>
+            
+            <div className="v-dash-walk-form">
+              <div className="v-dash-form-row">
+                <div className="v-dash-form-group">
+                  <label>Date</label>
+                  <input 
+                    type="date" 
+                    value={walkLog.walkDate}
+                    onChange={(e) => setWalkLog({...walkLog, walkDate: e.target.value})}
+                  />
+                  {formErrors.walkDate && <span className="v-dash-form-error">{formErrors.walkDate}</span>}
+                </div>
+                
+                <div className="v-dash-form-group">
+                  <label>Time</label>
+                  <input 
+                    type="time" 
+                    value={walkLog.walkTime}
+                    onChange={(e) => setWalkLog({...walkLog, walkTime: e.target.value})}
+                  />
+                  {formErrors.walkTime && <span className="v-dash-form-error">{formErrors.walkTime}</span>}
+                </div>
+              </div>
+              
+              <div className="v-dash-form-row">
+                <div className="v-dash-form-group">
+                  <label>Distance (km)</label>
+                  <input 
+                    type="number" 
+                    step="0.1"
+                    value={walkLog.distance}
+                    onChange={(e) => setWalkLog({...walkLog, distance: e.target.value})}
+                    placeholder="0.0"
+                  />
+                  {formErrors.distance && <span className="v-dash-form-error">{formErrors.distance}</span>}
+                </div>
+                
+                <div className="v-dash-form-group">
+                  <label>Duration (minutes)</label>
+                  <input 
+                    type="number" 
+                    value={walkLog.duration}
+                    onChange={(e) => setWalkLog({...walkLog, duration: e.target.value})}
+                    placeholder="30"
+                  />
+                  {formErrors.duration && <span className="v-dash-form-error">{formErrors.duration}</span>}
+                </div>
+              </div>
+
+              <div className="v-dash-form-group">
+                <label>Route/Location</label>
+                <input 
+                  type="text" 
+                  value={walkLog.route}
+                  onChange={(e) => setWalkLog({...walkLog, route: e.target.value})}
+                  placeholder="e.g., Park trail, neighborhood streets..."
+                />
+              </div>
+
+              <div className="v-dash-form-row">
+                <div className="v-dash-form-group">
+                  <label>Weather</label>
+                  <select 
+                    value={walkLog.weather}
+                    onChange={(e) => setWalkLog({...walkLog, weather: e.target.value})}
+                  >
+                    <option value="">Select weather</option>
+                    <option value="sunny">Sunny</option>
+                    <option value="cloudy">Cloudy</option>
+                    <option value="rainy">Rainy</option>
+                    <option value="snowy">Snowy</option>
+                    <option value="windy">Windy</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div className="v-dash-form-group">
+                  <label>Walk Quality</label>
+                  <select 
+                    value={walkLog.walkQuality}
+                    onChange={(e) => setWalkLog({...walkLog, walkQuality: e.target.value})}
+                  >
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="v-dash-form-group">
+                <label>Dog Behavior</label>
+                <select 
+                  value={walkLog.dogBehavior}
+                  onChange={(e) => setWalkLog({...walkLog, dogBehavior: e.target.value})}
+                >
+                  <option value="calm">Calm</option>
+                  <option value="excited">Excited</option>
+                  <option value="anxious">Anxious</option>
+                  <option value="aggressive">Aggressive</option>
+                  <option value="playful">Playful</option>
+                  <option value="tired">Tired</option>
+                </select>
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Activities</label>
+                {formErrors.activities && <span className="v-dash-form-error">{formErrors.activities}</span>}
+                <div className="v-dash-checkbox-group">
+                  <label className="v-dash-checkbox-item">
+                    <input 
+                      type="checkbox" 
+                      checked={walkLog.activities.includes('exercise')}
+                      onChange={(e) => {
+                        const activities = [...walkLog.activities];
+                        if (e.target.checked) {
+                          activities.push('exercise');
+                        } else {
+                          const index = activities.indexOf('exercise');
+                          if (index > -1) activities.splice(index, 1);
+                        }
+                        setWalkLog({...walkLog, activities});
+                      }}
+                    />
+                    <span>Exercise</span>
+                  </label>
+                  
+                  <label className="v-dash-checkbox-item">
+                    <input 
+                      type="checkbox" 
+                      checked={walkLog.activities.includes('play')}
+                      onChange={(e) => {
+                        const activities = [...walkLog.activities];
+                        if (e.target.checked) {
+                          activities.push('play');
+                        } else {
+                          const index = activities.indexOf('play');
+                          if (index > -1) activities.splice(index, 1);
+                        }
+                        setWalkLog({...walkLog, activities});
+                      }}
+                    />
+                    <span>Play</span>
+                  </label>
+                  
+                  <label className="v-dash-checkbox-item">
+                    <input 
+                      type="checkbox" 
+                      checked={walkLog.activities.includes('training')}
+                      onChange={(e) => {
+                        const activities = [...walkLog.activities];
+                        if (e.target.checked) {
+                          activities.push('training');
+                        } else {
+                          const index = activities.indexOf('training');
+                          if (index > -1) activities.splice(index, 1);
+                        }
+                        setWalkLog({...walkLog, activities});
+                      }}
+                    />
+                    <span>Training</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="v-dash-form-group">
+                <label>Notes</label>
+                <textarea 
+                  value={walkLog.notes}
+                  onChange={(e) => setWalkLog({...walkLog, notes: e.target.value})}
+                  placeholder="Any observations during the walk..."
+                  rows="3"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          
+          <div className="v-dash-modal-actions">
+            <button 
+              className="v-dash-secondary-btn"
+              onClick={closeWalkLogModal}
+            >
+              Cancel
+            </button>
+            <button 
+              className="v-dash-primary-btn"
+              onClick={handleWalkLog}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Logging...' : 'Log Walk'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  );
+
+  // Render Task Details Modal
   const renderTaskDetailsModal = () => (
     showTaskDetails && selectedTask && (
       <div className="v-dash-modal-overlay">
@@ -1125,10 +2194,10 @@ useEffect(() => {
                 <h5 style={{ 
                   fontSize: '0.875rem',
                   fontWeight: '600',
-                  color: '#374151',
+                  color: '#07869dff',
                   marginBottom: '8px'
                 }}>
-                  Description
+                  Description:
                 </h5>
                 <p style={{ 
                   fontSize: '0.875rem',
@@ -1139,7 +2208,7 @@ useEffect(() => {
                   {selectedTask.taskDescription}
                 </p>
               </div>
-            )}
+            )}<br></br>
             
             <div style={{ 
               display: 'grid', 
@@ -1151,10 +2220,10 @@ useEffect(() => {
                 <h5 style={{ 
                   fontSize: '0.875rem',
                   fontWeight: '600',
-                  color: '#374151',
+                  color: '#07869dff',
                   marginBottom: '4px'
                 }}>
-                  Scheduled Time
+                  Scheduled Time:
                 </h5>
                 <p style={{ 
                   fontSize: '0.875rem',
@@ -1163,16 +2232,16 @@ useEffect(() => {
                 }}>
                   {selectedTask.scheduledTime ? new Date(selectedTask.scheduledTime).toLocaleString() : 'Not scheduled'}
                 </p>
-              </div>
+              </div><br></br><br></br><br></br>
               
               <div>
                 <h5 style={{ 
                   fontSize: '0.875rem',
                   fontWeight: '600',
-                  color: '#374151',
+                  color: '#07869dff',
                   marginBottom: '4px'
                 }}>
-                  Priority
+                  Priority:
                 </h5>
                 <span style={{
                   padding: '2px 8px',
@@ -1192,17 +2261,17 @@ useEffect(() => {
                   {selectedTask.priority || 'Normal'}
                 </span>
               </div>
-            </div>
+            </div><br></br>
             
             {selectedTask.estimatedDuration && (
               <div style={{ marginBottom: '16px' }}>
                 <h5 style={{ 
                   fontSize: '0.875rem',
                   fontWeight: '600',
-                  color: '#374151',
+                  color: '#07869dff',
                   marginBottom: '4px'
                 }}>
-                  Estimated Duration
+                  Estimated Duration:
                 </h5>
                 <p style={{ 
                   fontSize: '0.875rem',
@@ -1258,6 +2327,774 @@ useEffect(() => {
       </div>
     )
   );
+
+  // Render Volunteer Management Section
+  const renderVolunteerManagement = () => {
+    return (
+      <section className="v-dash-section">
+        <div className="v-dash-section-header">
+          <h2 style={{ 
+            fontSize: '2rem', 
+            fontWeight: '700', 
+            background: 'linear-gradient(135deg, #7a8bd9ff 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            marginBottom: '8px'
+          }}>
+            👥 My Assignments
+          </h2>
+          <p style={{ 
+            fontSize: '1.1rem', 
+            color: '#64748b',
+            fontWeight: '400'
+          }}>
+            Manage your assigned dogs and tasks
+          </p>
+        </div><br></br>
+
+        {/* Assigned Dogs Section */}
+        <div style={{ marginBottom: '32px' }}>
+          <h3
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    fontSize: '1.9rem',
+    fontWeight: 700,
+    marginBottom: '28px',
+    color: '#1f2937',
+    position: 'relative',
+    letterSpacing: '-0.5px',
+    padding: '14px 0',
+    background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+     WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    textShadow: '0 2px 8px rgba(37, 117, 252, 0.25)',
+  }}
+>
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '48px',
+      height: '48px',
+      borderRadius: '14px',
+      background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
+      boxShadow: '0 6px 14px rgba(37, 117, 252, 0.4)',
+      transform: 'rotate(-5deg)',
+      transition: 'all 0.3s ease',
+    }}
+    onMouseEnter={(e) => (e.currentTarget.style.transform = 'rotate(0deg) scale(1.05)')}
+    onMouseLeave={(e) => (e.currentTarget.style.transform = 'rotate(-5deg)')}
+  >
+    <PawPrint size={26} color="white" />
+  </div>
+
+  <span
+    style={{
+      flexGrow: 1,
+      borderBottom: '2px solid #e5e7eb',
+      paddingBottom: '6px',
+      
+      borderRadius: '4px',
+    }}
+  >
+    My Assigned Dogs
+  </span>
+</h3>
+
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+            gap: '20px'
+          }}>
+            {assignedDogs.length > 0 ? assignedDogs.map((assignment) => {
+              const dog = assignment.dogId || assignment;
+              return (
+                <div 
+                  key={dog._id}
+                  style={{
+                    background: 'linear-gradient(145deg, #ffffffff 0%, #ffffffff 100%)',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.8)',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    border: 'black'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
+                  }}
+                >
+                  {/* Status Badge */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    padding: '4px 12px',
+                    backgroundColor: '#dbeafe',
+                    color: '#3b82f6',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600'
+                  }}>
+                    Assigned
+                  </div>
+
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '16px',
+                    marginBottom: '20px'
+                  }}>
+                    <img 
+                      src={dog.photo ? `http://localhost:3000/uploads/dogs/${dog.photo}` : 'https://placedog.net/300/300?id=1'} 
+                      alt={dog.name}
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '3px solid #ffffff',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ 
+                        fontSize: '1.25rem', 
+                        fontWeight: '700',
+                        color: '#1f2937',
+                        margin: '0 0 4px 0'
+                      }}>
+                        {dog.name}
+                      </h4>
+                      <p style={{ 
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        margin: '0 0 8px 0'
+                      }}>
+                        {dog.breed || 'Mixed Breed'} • {dog.age || 'Unknown age'}
+                      </p>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 8px',
+                        backgroundColor: dog.healthStatus?.toLowerCase() === 'healthy' ? '#dcfce7' : '#fef3c7',
+                        color: dog.healthStatus?.toLowerCase() === 'healthy' ? '#166534' : '#d97706',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}>
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: dog.healthStatus?.toLowerCase() === 'healthy' ? '#10b981' : '#f59e0b'
+                        }} />
+                        {dog.healthStatus || 'Unknown Health'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '12px',
+                    marginBottom: '16px'
+                  }}>
+                    <button 
+                      onClick={() => openHealthReportModal(dog)}
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: '#3876dbff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                    >
+                      <Plus size={14} />
+                      Health Report
+                    </button>
+                    
+                    <button 
+                      onClick={() => openWalkLogModal(dog)}
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: '#0da371ff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                    >
+                      <MapPin size={14} />
+                      Log Walk
+                    </button>
+                  </div>
+
+                  {/* View Reports and Walks Buttons */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '12px',
+                    marginBottom: '16px'
+                  }}>
+                    <button 
+                      onClick={() => openHealthReportsModal(dog)}
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: 'transparent',
+                        color: '#4d5971ff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f9fafb';
+                        e.target.style.color = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.color = '#6b7280';
+                      }}
+                    >
+                      <FileText size={14} />
+                      View Health Reports
+                    </button>
+
+                    <button 
+                      onClick={() => openRecentWalksModal(dog)}
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: 'transparent',
+                        color: '#475063ff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f9fafb';
+                        e.target.style.color = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.color = '#6b7280';
+                      }}
+                    >
+                      <MapPin size={14} />
+                      View Recent Walks
+                    </button>
+                  </div>
+
+                  {/* Recent Health Summary */}
+                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '8px'
+                    }}>
+                      <span style={{ 
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: '#374151'
+                      }}>
+                        Recent Health
+                      </span>
+                      <span style={{ 
+                        fontSize: '0.75rem',
+                        color: '#6b7280'
+                      }}>
+                        {healthReports.filter(r => getReportDogId(r) === dog._id).length} reports
+                      </span>
+                    </div>
+                    
+                    {healthReports.filter(r => getReportDogId(r) === dog._id).length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {healthReports
+                          .filter(r => getReportDogId(r) === dog._id)
+                          .sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
+                          .slice(0, 2)
+                          .map((report, index) => (
+                          <div 
+                            key={report._id || index}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '6px 8px',
+                              backgroundColor: '#f0f7ffff',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            <span style={{ color: '#64748b' }}>
+                              {new Date(report.date || report.createdAt || Date.now()).toLocaleDateString()}
+                            </span>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              {report.eatingHabits && (
+                                <span style={{
+                                  padding: '2px 4px',
+                                  backgroundColor: '#dbeafe',
+                                  color: '#3b82f6',
+                                  borderRadius: '4px',
+                                  fontSize: '0.6rem'
+                                }}>
+                                  E: {report.eatingHabits.charAt(0)}
+                                </span>
+                              )}
+                              {report.mood && (
+                                <span style={{
+                                  padding: '2px 4px',
+                                  backgroundColor: '#fef3c7',
+                                  color: '#f59e0b',
+                                  borderRadius: '4px',
+                                  fontSize: '0.6rem'
+                                }}>
+                                  M: {report.mood.charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ 
+                        fontSize: '0.75rem',
+                        color: '#9ca3af',
+                        margin: 0,
+                        fontStyle: 'italic',
+                        textAlign: 'center'
+                      }}>
+                        No health reports yet
+                      </p>
+                    )}
+                  </div>
+
+{/* Recent Walks Summary */}
+<div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #215b96ff' }}>
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px'
+  }}>
+    <span style={{ 
+      fontSize: '0.8rem',
+      fontWeight: '600',
+      color: '#102a52ff'
+    }}>
+      Recent Walks
+    </span>
+    <span style={{ 
+      fontSize: '0.75rem',
+      color: '#6b7280'
+    }}>
+      {/* Get walks for this specific dog from walkingData */}
+      {(walkingData.walks || walkingData.recentWalks || []).filter(walk => {
+        const walkDogId = walk.dogId?._id || walk.dogId || walk.dog?._id || walk.dog;
+        return walkDogId === dog._id;
+      }).length} walks
+    </span>
+  </div>
+  
+  {/* Get walks for this specific dog from walkingData */}
+  {(walkingData.walks || walkingData.recentWalks || []).filter(walk => {
+    const walkDogId = walk.dogId?._id || walk.dogId || walk.dog?._id || walk.dog;
+    return walkDogId === dog._id;
+  }).length > 0 ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {(walkingData.walks || walkingData.recentWalks || [])
+        .filter(walk => {
+          const walkDogId = walk.dogId?._id || walk.dogId || walk.dog?._id || walk.dog;
+          return walkDogId === dog._id;
+        })
+        .sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
+        .slice(0, 2)
+        .map((walk, index) => (
+        <div 
+          key={walk._id || index}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '6px 8px',
+            backgroundColor: '#e0fbe8ff',
+            borderRadius: '6px',
+            fontSize: '0.75rem'
+          }}
+        >
+          <span style={{ color: '#64748b' }}>
+            {new Date(walk.date || walk.createdAt || Date.now()).toLocaleDateString()}
+          </span>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <span style={{
+              padding: '2px 4px',
+              backgroundColor: '#dbeafe',
+              color: '#3b82f6',
+              borderRadius: '4px',
+              fontSize: '0.6rem',
+              fontWeight: '600'
+            }}>
+              {typeof walk.distance === 'number' ? walk.distance.toFixed(1) : walk.distance}km
+            </span>
+            <span style={{
+              padding: '2px 4px',
+              backgroundColor: '#fef3c7',
+              color: '#f59e0b',
+              borderRadius: '4px',
+              fontSize: '0.6rem'
+            }}>
+              {walk.duration}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p style={{ 
+      fontSize: '0.75rem',
+      color: '#9ca3af',
+      margin: 0,
+      fontStyle: 'italic',
+      textAlign: 'center'
+    }}>
+      No recent walks yet
+    </p>
+  )}
+</div>
+                </div>
+              );
+            }) : (
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '16px',
+                padding: '40px 20px',
+                textAlign: 'center',
+                border: '2px dashed #e5e7eb',
+                gridColumn: '1 / -1'
+              }}>
+                <PawPrint size={48} color="#9ca3af" />
+                <h4 style={{ 
+                  fontSize: '1.125rem', 
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  margin: '16px 0 8px 0'
+                }}>
+                  No Dogs Assigned
+                </h4>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#9ca3af',
+                  margin: '0'
+                }}>
+                  You haven't been assigned any dogs yet.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tasks Section */}
+        <div>
+         <h3
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    fontSize: '1.9rem',
+    fontWeight: 700,
+    marginBottom: '28px',
+    color: '#1f2937',
+    position: 'relative',
+    letterSpacing: '-0.5px',
+    padding: '14px 0',
+    background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    textShadow: '0 2px 8px rgba(37, 117, 252, 0.25)',
+  }}
+>
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '44px',
+      height: '44px',
+      borderRadius: '12px',
+       background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
+      boxShadow: '0 4px 10px rgba(59, 130, 246, 0.35)',
+      transition: 'all 0.3s ease',
+    }}
+    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.07) rotate(3deg)')}
+    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1) rotate(0deg)')}
+  >
+    <ClipboardList size={24} color="white" />
+  </div>
+  My Tasks
+</h3>
+
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+            gap: '20px'
+          }}>
+            {volunteerTasks.length > 0 ? volunteerTasks.map((task) => (
+              <div 
+                key={task._id}
+                style={{
+                  background: 'linear-gradient(145deg, #eafffdff 0%, #f8fafc 100%)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.8)',
+                  transition: 'all 0.3s ease',
+                  borderLeft: `4px solid ${
+                    task.status === 'completed' ? '#10b981' : 
+                    task.status === 'in-progress' ? '#3b82f6' : 
+                    '#f59e0b'
+                  }`
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: '12px'
+                }}>
+                  <h4 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '600',
+                    color: '#1f2937',
+                    margin: '0'
+                  }}>
+                    {task.taskType}
+                  </h4>
+                  <span style={{
+                    padding: '4px 12px',
+                    backgroundColor: 
+                      task.status === 'completed' ? '#dcfce7' : 
+                      task.status === 'in-progress' ? '#dbeafe' : 
+                      '#fef3c7',
+                    color: 
+                      task.status === 'completed' ? '#166534' : 
+                      task.status === 'in-progress' ? '#1e40af' : 
+                      '#92400e',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    textTransform: 'capitalize'
+                  }}>
+                    {task.status}
+                  </span>
+                </div>
+                
+                {task.taskDescription && (
+                  <p style={{ 
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    marginBottom: '12px',
+                    lineHeight: '1.4'
+                  }}>
+                    {task.taskDescription}
+                  </p>
+                )}
+                
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '16px'
+                }}>
+                  <div>
+                    <p style={{ 
+                      fontSize: '0.75rem',
+                      color: '#9ca3af',
+                      margin: '0 0 4px 0'
+                    }}>
+                      Scheduled
+                    </p>
+                    <p style={{ 
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      margin: '0',
+                      fontWeight: '500'
+                    }}>
+                      {task.scheduledTime ? new Date(task.scheduledTime).toLocaleString() : 'Not scheduled'}
+                    </p>
+                  </div>
+                  
+                  {task.priority && (
+                    <div>
+                      <p style={{ 
+                        fontSize: '0.75rem',
+                        color: '#9ca3af',
+                        margin: '0 0 4px 0',
+                        textAlign: 'right'
+                      }}>
+                        Priority
+                      </p>
+                      <span style={{
+                        padding: '2px 8px',
+                        backgroundColor: 
+                          task.priority === 'high' ? '#fef2f2' : 
+                          task.priority === 'medium' ? '#fffbeb' : 
+                          '#f0fdf4',
+                        color: 
+                          task.priority === 'high' ? '#dc2626' : 
+                          task.priority === 'medium' ? '#d97706' : 
+                          '#16a34a',
+                        borderRadius: '8px',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize'
+                      }}>
+                        {task.priority}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '8px',
+                  justifyContent: 'flex-end'
+                }}>
+                  <button 
+                    onClick={() => handleViewTaskDetails(task)}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: 'transparent',
+                      color: '#6b7280',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.color = '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                      e.target.style.color = '#6b7280';
+                    }}
+                  >
+                    <Eye size={12} style={{ marginRight: '4px' }} />
+                    Details
+                  </button>
+                  
+                  {task.status !== 'completed' && (
+                    <button 
+                      onClick={() => handleUpdateTaskStatus(task._id, 'completed')}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                    >
+                      Complete
+                    </button>
+                  )}
+                </div>
+              </div>
+            )) : (
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '16px',
+                padding: '40px 20px',
+                textAlign: 'center',
+                border: '2px dashed #e5e7eb'
+              }}>
+                <ClipboardList size={48} color="#9ca3af" />
+                <h4 style={{ 
+                  fontSize: '1.125rem', 
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  margin: '16px 0 8px 0'
+                }}>
+                  No Tasks Assigned
+                </h4>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: '#9ca3af',
+                  margin: '0'
+                }}>
+                  You don't have any tasks assigned at the moment.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  };
 
   // Show loading spinner
   if (loading) {
@@ -1332,6 +3169,7 @@ useEffect(() => {
                   <option value="increased">Increased</option>
                   <option value="none">None</option>
                 </select>
+                {formErrors.eatingHabits && <span className="v-dash-form-error">{formErrors.eatingHabits}</span>}
               </div>
               
               <div className="v-dash-form-group">
@@ -1347,16 +3185,19 @@ useEffect(() => {
                   <option value="depressed">Depressed</option>
                   <option value="normal">Normal</option>
                 </select>
+                {formErrors.mood && <span className="v-dash-form-error">{formErrors.mood}</span>}
               </div>
               
               <div className="v-dash-form-group">
                 <label>Weight (kg)</label>
                 <input 
                   type="number" 
+                  step="0.1"
                   value={modalHealthReport.weight}
                   onChange={(e) => setModalHealthReport({...modalHealthReport, weight: e.target.value})}
                   placeholder="Enter weight"
                 />
+                {formErrors.weight && <span className="v-dash-form-error">{formErrors.weight}</span>}
               </div>
               
               <div className="v-dash-form-group">
@@ -1367,6 +3208,7 @@ useEffect(() => {
                   placeholder="Enter any observations here..."
                   rows="3"
                 />
+                {formErrors.observations && <span className="v-dash-form-error">{formErrors.observations}</span>}
               </div>
               
               <div className="v-dash-form-group">
@@ -1438,13 +3280,26 @@ useEffect(() => {
               <button 
                 className="v-dash-primary-btn"
                 onClick={handleModalHealthReportSubmit}
+                disabled={isSubmitting}
               >
-                Submit Health Report
+                {isSubmitting ? 'Submitting...' : 'Submit Health Report'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* NEW: Health Reports View Modal */}
+      {renderHealthReportsModal()}
+
+      {/* NEW: Recent Walks Modal */}
+      {renderRecentWalksModal()}
+
+      {/* NEW: Quick Walk Modal */}
+      {renderQuickWalkModal()}
+
+      {/* NEW: Walk Log Modal */}
+      {renderWalkLogModal()}
 
       {/* Task Details Modal */}
       {renderTaskDetailsModal()}
@@ -1559,18 +3414,7 @@ useEffect(() => {
               <span>Overview</span>
             </button>
             
-            <button 
-              className={`v-dash-nav-item ${activeSection === 'tasks' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveSection('tasks');
-                setMobileMenuOpen(false);
-              }}
-            >
-              <CheckCircle size={20} />
-              <span>Tasks & Care</span>
-            </button>
-            
-            {/* NEW: Volunteer Management Navigation Item */}
+            {/* Volunteer Management Navigation Item */}
             <button 
               className={`v-dash-nav-item ${activeSection === 'volunteer-management' ? 'active' : ''}`}
               onClick={() => {
@@ -1580,17 +3424,6 @@ useEffect(() => {
             >
               <Users size={20} />
               <span>My Assignments</span>
-            </button>
-            
-            <button 
-              className={`v-dash-nav-item ${activeSection === 'walks' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveSection('walks');
-                setMobileMenuOpen(false);
-              }}
-            >
-              <MapPin size={20} />
-              <span>Walking Tracker</span>
             </button>
             
             <button 
@@ -1635,71 +3468,42 @@ useEffect(() => {
           {activeSection === 'overview' && (
             <section className="v-dash-section">
               <div className="v-dash-section-header">
-                <h2>Dashboard Overview</h2>
-                <p>Welcome back, {userData.name || 'User'}! Here's what's happening today.</p>
+                <h2 style={{ 
+                  fontSize: '2.5rem', 
+                  fontWeight: '700', 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  marginBottom: '8px'
+                }}>
+                  🎯 Dashboard Overview
+                </h2>
+                <p style={{ 
+                  fontSize: '1.2rem', 
+                  color: '#64748b',
+                  fontWeight: '400'
+                }}>
+                  Welcome back, {userData.name || 'User'}! Here's what's happening today.
+                </p>
               </div>
               
-              <div className="v-dash-stats-grid">
-                <div className="v-dash-stat-card">
-                  <div className="v-dash-stat-icon">
-                    <Clock size={24} />
-                  </div>
-                  <div className="v-dash-stat-info">
-                    <h3>{dashboardData?.statistics?.volunteerHours || 0} hours</h3>
-                    <p>Total Volunteered</p>
-                  </div>
+              {/* Enhanced Statistics */}
+              <StatisticsDisplay />
+              
+              {/* Activity Overview */}
+              <div className="v-dash-overview-content">
+                <div className="v-dash-overview-left">
+                  <ActivityChart />
                 </div>
-                
-                <div className="v-dash-stat-card">
-                  <div className="v-dash-stat-icon">
-                    <PawPrint size={24} />
-                  </div>
-                  <div className="v-dash-stat-info">
-                    <h3>{dashboardData?.assignedDogs?.length || 0} dogs</h3>
-                    <p>Under Your Care</p>
-                  </div>
-                </div>
-                
-                <div className="v-dash-stat-card">
-                  <div className="v-dash-stat-icon">
-                    <CheckCircle size={24} />
-                  </div>
-                  <div className="v-dash-stat-info">
-                    <h3>{dashboardData?.statistics?.completedTasks || 0} tasks</h3>
-                    <p>Completed This Month</p>
-                  </div>
-                </div>
-                
-                <div className="v-dash-stat-card">
-                  <div className="v-dash-stat-icon">
-                    <TrendingUp size={24} />
-                  </div>
-                  <div className="v-dash-stat-info">
-                    <h3>{dashboardData?.statistics?.totalDistance?.toFixed(1) || 0} km</h3>
-                    <p>Total Walked</p>
-                  </div>
+                <div className="v-dash-overview-right">
+                  <RecentActivity />
                 </div>
               </div>
               
+              {/* Quick Actions */}
               <div className="v-dash-overview-actions">
                 <h3>Quick Actions</h3>
                 <div className="v-dash-action-buttons">
-                  <button 
-                    className="v-dash-action-btn"
-                    onClick={() => setActiveSection('health')}
-                  >
-                    <Plus size={18} />
-                    <span>Submit Health Report</span>
-                  </button>
-                  
-                  <button 
-                    className="v-dash-action-btn"
-                    onClick={() => setActiveSection('walks')}
-                  >
-                    <MapPin size={18} />
-                    <span>Log a Walk</span>
-                  </button>
-                  
                   <button 
                     className="v-dash-action-btn"
                     onClick={() => {
@@ -1713,1053 +3517,28 @@ useEffect(() => {
                   
                   <button 
                     className="v-dash-action-btn"
-                    onClick={handleDownloadReport}
+                    onClick={() => setActiveSection('volunteer-management')}
                   >
-                    <Download size={18} />
-                    <span>Download Report</span>
+                    <Users size={18} />
+                    <span>Manage Assignments</span>
                   </button>
-                </div>
-              </div>
-              
-              <div className="v-dash-upcoming-tasks">
-                <h3>Upcoming Tasks</h3>
-                <div className="v-dash-task-list">
-                  {dashboardData?.upcomingTasks?.map(task => (
-                    <div key={task._id} className="v-dash-task-item">
-                      <div className="v-dash-task-info">
-                        <img src={task.dogId?.photo || 'https://placedog.net/300/300?id=1'} alt={task.dogId?.name || 'Dog'} className="v-dash-task-dog-img" />
-                        <div>
-                          <h4>{task.dogId?.name || 'Unknown Dog'} - {task.taskType}</h4>
-                          <p>{new Date(task.scheduledTime).toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <button 
-                        className="v-dash-task-complete-btn"
-                        onClick={() => markTaskComplete(task._id)}
-                      >
-                        Mark Complete
-                      </button>
-                    </div>
-                  )) || <p>No upcoming tasks</p>}
-                </div>
-              </div>
-            </section>
-          )}
-          
-          {/* Tasks & Care Section */}
-          {activeSection === 'tasks' && (
-            <section className="v-dash-section">
-              <div className="v-dash-section-header">
-                <h2 style={{ 
-                  fontSize: '2rem', 
-                  fontWeight: '700', 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  marginBottom: '8px'
-                }}>
-                  🐕 Assigned Dogs & Tasks
-                </h2>
-                <p style={{ 
-                  fontSize: '1.1rem', 
-                  color: '#64748b',
-                  fontWeight: '400'
-                }}>
-                  Manage your daily tasks and care routines with love
-                </p>
-              </div>
-              
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', 
-                gap: '24px',
-                marginTop: '32px'
-              }}>
-                {assignedTasks.length > 0 ? assignedTasks.map(dogGroup => (
-                  <div 
-                    key={dogGroup.dog._id} 
-                    style={{
-                      background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-                      borderRadius: '20px',
-                      padding: '24px',
-                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 8px rgba(0, 0, 0, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.8)',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-8px)';
-                      e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 8px rgba(0, 0, 0, 0.05)';
-                    }}
-                  >
-                    {/* Decorative gradient overlay */}
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      background: 'linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%)'
-                    }} />
-                    
-                    {/* Dog Header */}
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '16px',
-                      marginBottom: '20px'
-                    }}>
-                      <div style={{ position: 'relative' }}>
-                        <img 
-                          src={dogGroup.dog.photo ? `http://localhost:3000/uploads/dogs/${dogGroup.dog.photo}` : 'https://placedog.net/300/300?id=1'} 
-                          alt={dogGroup.dog.name}
-                          style={{
-                            width: '80px',
-                            height: '80px',
-                            borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: '4px solid #ffffff',
-                            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)'
-                          }}
-                        />
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '0',
-                          right: '0',
-                          width: '24px',
-                          height: '24px',
-                          backgroundColor: dogGroup.dog.healthStatus?.toLowerCase() === 'healthy' ? '#10b981' : '#f59e0b',
-                          borderRadius: '50%',
-                          border: '3px solid white',
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
-                        }} />
-                      </div>
-                      
-                      <div style={{ flex: 1 }}>
-                        <h3 style={{ 
-                          fontSize: '1.5rem', 
-                          fontWeight: '700',
-                          color: '#1f2937',
-                          margin: '0 0 4px 0'
-                        }}>
-                          {dogGroup.dog.name}
-                        </h3>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 12px',
-                          backgroundColor: dogGroup.dog.healthStatus?.toLowerCase() === 'healthy' ? '#dcfdf7' : '#fef3c7',
-                          color: dogGroup.dog.healthStatus?.toLowerCase() === 'healthy' ? '#059669' : '#d97706',
-                          borderRadius: '20px',
-                          fontSize: '0.875rem',
-                          fontWeight: '600'
-                        }}>
-                          <span style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: dogGroup.dog.healthStatus?.toLowerCase() === 'healthy' ? '#10b981' : '#f59e0b'
-                          }} />
-                          {dogGroup.dog.healthStatus || 'Unknown'}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Tasks Section */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ 
-                        fontSize: '1.125rem', 
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        📋 Active Tasks
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {dogGroup.tasks.map((task) => (
-                          <div 
-                            key={task._id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '12px 16px',
-                              backgroundColor: task.status === 'completed' ? '#f0fdf4' : '#f8fafc',
-                              borderRadius: '12px',
-                              border: `2px solid ${task.status === 'completed' ? '#bbf7d0' : '#e2e8f0'}`,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <span style={{
-                              fontSize: '0.95rem',
-                              fontWeight: '500',
-                              color: task.status === 'completed' ? '#166534' : '#475569'
-                            }}>
-                              {task.taskType}
-                            </span>
-                            {task.status === 'pending' ? (
-                              <button 
-                                onClick={() => markTaskComplete(task._id)}
-                                style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: '#3b82f6',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  fontSize: '0.85rem',
-                                  fontWeight: '600',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease'
-                                }}
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
-                              >
-                                ✓ Complete
-                              </button>
-                            ) : (
-                              <span style={{
-                                padding: '4px 8px',
-                                backgroundColor: '#10b981',
-                                color: 'white',
-                                borderRadius: '6px',
-                                fontSize: '0.75rem',
-                                fontWeight: '600'
-                              }}>
-                                ✓ Done
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Next Task */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ 
-                        fontSize: '1rem', 
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        ⏰ Next Task
-                      </h4>
-                      <p style={{ 
-                        fontSize: '0.9rem',
-                        color: '#6b7280',
-                        margin: 0,
-                        padding: '8px 12px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '8px',
-                        borderLeft: '3px solid #3b82f6'
-                      }}>
-                        {dogGroup.tasks[0] ? new Date(dogGroup.tasks[0].scheduledTime).toLocaleString() : 'No scheduled tasks'}
-                      </p>
-                    </div>
-                    
-                    {/* Recent Health */}
-                    <div style={{ marginBottom: '24px' }}>
-                      <h4 style={{ 
-                        fontSize: '1rem', 
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        💊 Recent Health
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {Array.isArray(healthReports) && healthReports
-                          .filter(r => getReportDogId(r) === dogGroup.dog._id)
-                          .sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
-                          .slice(0, 3)
-                          .map((r) => (
-                          <div 
-                            key={r._id} 
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '8px 12px',
-                              backgroundColor: '#fefefe',
-                              borderRadius: '8px',
-                              border: '1px solid #f1f5f9'
-                            }}
-                          >
-                            <span style={{ 
-                              fontSize: '0.8rem', 
-                              color: '#64748b',
-                              fontWeight: '500'
-                            }}>
-                              {new Date(r.date || r.createdAt || Date.now()).toLocaleDateString()}
-                            </span>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              {r.eatingHabits && (
-                                <span style={{
-                                  padding: '2px 6px',
-                                  backgroundColor: '#dbeafe',
-                                  color: '#3b82f6',
-                                  borderRadius: '4px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: '600'
-                                }}>
-                                  E: {r.eatingHabits}
-                                </span>
-                              )}
-                              {r.mood && (
-                                <span style={{
-                                  padding: '2px 6px',
-                                  backgroundColor: '#fef3c7',
-                                  color: '#f59e0b',
-                                  borderRadius: '4px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: '600'
-                                }}>
-                                  M: {r.mood}
-                                </span>
-                              )}
-                              {r.weight && (
-                                <span style={{
-                                  padding: '2px 6px',
-                                  backgroundColor: '#ecfdf5',
-                                  color: '#10b981',
-                                  borderRadius: '4px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: '600'
-                                }}>
-                                  {r.weight}kg
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        {!(Array.isArray(healthReports) && healthReports.filter(r => getReportDogId(r) === dogGroup.dog._id).length > 0) && (
-                          <p style={{ 
-                            fontSize: '0.85rem',
-                            color: '#9ca3af',
-                            margin: 0,
-                            fontStyle: 'italic',
-                            textAlign: 'center',
-                            padding: '12px'
-                          }}>
-                            No recent health reports
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Action Button */}
-                    <button 
-                      onClick={() => openHealthReportModal(dogGroup.dog)}
-                      style={{
-                        width: '100%',
-                        padding: '14px 20px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        fontSize: '1rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px)';
-                        e.target.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.4)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    >
-                      📝 Submit Health Report
-                    </button>
-                  </div>
-                )) : (
-                  (
-                    (dashboardData?.assignedDogs && dashboardData.assignedDogs.length > 0
-                      ? dashboardData.assignedDogs
-                      : availableDogs
-                    ) || []
-                  ).map((dog) => (
-                    <div 
-                      key={dog._id} 
-                      style={{
-                        background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-                        borderRadius: '20px',
-                        padding: '24px',
-                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 8px rgba(0, 0, 0, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.8)',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        opacity: 0.8
-                      }}
-                    >
-                      {/* Decorative gradient overlay */}
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '4px',
-                        background: 'linear-gradient(90deg, #9ca3af 0%, #6b7280 100%)'
-                      }} />
-                      
-                      {/* Dog Header */}
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '16px',
-                        marginBottom: '20px'
-                      }}>
-                        <div style={{ position: 'relative' }}>
-                          <img 
-                            src={dog.photo ? `http://localhost:3000/uploads/dogs/${dog.photo}` : dog.imageUrl || 'https://placedog.net/300/300?id=1'} 
-                            alt={dog.name}
-                            style={{
-                              width: '80px',
-                              height: '80px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: '4px solid #ffffff',
-                              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)'
-                            }}
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '0',
-                            right: '0',
-                            width: '24px',
-                            height: '24px',
-                            backgroundColor: '#9ca3af',
-                            borderRadius: '50%',
-                            border: '3px solid white',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
-                          }} />
-                        </div>
-                        
-                        <div style={{ flex: 1 }}>
-                          <h3 style={{ 
-                            fontSize: '1.5rem', 
-                            fontWeight: '700',
-                            color: '#1f2937',
-                            margin: '0 0 4px 0'
-                          }}>
-                            {dog.name}
-                          </h3>
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 12px',
-                            backgroundColor: '#f3f4f6',
-                            color: '#6b7280',
-                            borderRadius: '20px',
-                            fontSize: '0.875rem',
-                            fontWeight: '600'
-                          }}>
-                            <span style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              backgroundColor: '#9ca3af'
-                            }} />
-                            No tasks assigned
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Recent Health */}
-                      <div style={{ marginBottom: '24px' }}>
-                        <h4 style={{ 
-                          fontSize: '1rem', 
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          💊 Recent Health
-                        </h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {Array.isArray(healthReports) && healthReports
-                            .filter(r => getReportDogId(r) === dog._id)
-                            .sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
-                            .slice(0, 3)
-                            .map((r) => (
-                            <div 
-                              key={r._id} 
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '8px 12px',
-                                backgroundColor: '#fefefe',
-                                borderRadius: '8px',
-                                border: '1px solid #f1f5f9'
-                              }}
-                            >
-                              <span style={{ 
-                                fontSize: '0.8rem', 
-                                color: '#64748b',
-                                fontWeight: '500'
-                              }}>
-                                {new Date(r.date || r.createdAt || Date.now()).toLocaleDateString()}
-                              </span>
-                              <div style={{ display: 'flex', gap: '4px' }}>
-                                {r.eatingHabits && (
-                                  <span style={{
-                                    padding: '2px 6px',
-                                    backgroundColor: '#dbeafe',
-                                    color: '#3b82f6',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600'
-                                  }}>
-                                    E: {r.eatingHabits}
-                                  </span>
-                                )}
-                                {r.mood && (
-                                  <span style={{
-                                    padding: '2px 6px',
-                                    backgroundColor: '#fef3c7',
-                                    color: '#f59e0b',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600'
-                                  }}>
-                                    M: {r.mood}
-                                  </span>
-                                )}
-                                {r.weight && (
-                                  <span style={{
-                                    padding: '2px 6px',
-                                    backgroundColor: '#ecfdf5',
-                                    color: '#10b981',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600'
-                                  }}>
-                                    {r.weight}kg
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {!(Array.isArray(healthReports) && healthReports.filter(r => getReportDogId(r) === dog._id).length > 0) && (
-                            <p style={{ 
-                              fontSize: '0.85rem',
-                              color: '#9ca3af',
-                              margin: 0,
-                              fontStyle: 'italic',
-                              textAlign: 'center',
-                              padding: '12px'
-                            }}>
-                              No recent health reports
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action Button */}
-                      <button
-                        onClick={() => openHealthReportModal(dog)}
-                        style={{
-                          width: '100%',
-                          padding: '14px 20px',
-                          background: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '12px',
-                          fontSize: '1rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.transform = 'translateY(-2px)';
-                          e.target.style.boxShadow = '0 8px 20px rgba(156, 163, 175, 0.4)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.transform = 'translateY(0)';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      >
-                        📝 Submit Health Report
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* NEW: Volunteer Management Section */}
-          {activeSection === 'volunteer-management' && renderVolunteerManagement()}
-          
-          {/* Health Reports Section */}
-          {activeSection === 'health' && (
-            <section className="v-dash-section">
-              <div className="v-dash-section-header">
-                <h2>Health Reporting</h2>
-                <p>Submit health reports for dogs under your care</p>
-              </div>
-              
-              {assignedTasks.length > 0 ? (
-                <div className="v-dash-health-grid">
-                  {assignedTasks.map(dogGroup => (
-                    <div key={dogGroup.dog._id} className="v-dash-health-card">
-                      <div className="v-dash-health-header">
-                        <img src={dogGroup.dog.photo ? `http://localhost:3000/uploads/dogs/${dogGroup.dog.photo}` : 'https://placedog.net/300/300?id=1'} alt={dogGroup.dog.name} />
-                        <h3>{dogGroup.dog.name}</h3>
-                        <span className={`status-indicator ${dogGroup.dog.healthStatus?.toLowerCase().replace(' ', '-')}`}>{dogGroup.dog.healthStatus || 'Unknown'}</span>
-                      </div>
-                      
-                      <button 
-                        className="v-dash-primary-btn"
-                        onClick={() => openHealthReportModal(dogGroup.dog)}
-                      >
-                        Submit Health Report
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="v-dash-health-card" style={{ maxWidth: '720px', margin: '0 auto' }}>
-                  <div className="v-dash-health-header">
-                    <Heart size={24} />
-                    <h3>General Health Report</h3>
-                  </div>
-
-                  <div className="v-dash-health-form">
-                    <div className="v-dash-form-group">
-                      <label>Select Dog</label>
-                      <select 
-                        value={healthReport.dogId}
-                        onChange={(e) => setHealthReport({ ...healthReport, dogId: e.target.value })}
-                        className="v-dash-dog-dropdown"
-                      >
-                        <option value="">Choose a dog</option>
-                        {(dashboardData?.assignedDogs?.length ? dashboardData.assignedDogs : availableDogs)?.map((dog) => (
-                          <option key={dog._id} value={dog._id}>{dog.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="v-dash-form-group">
-                      <label>Eating Habits</label>
-                      <select 
-                        value={healthReport.eatingHabits}
-                        onChange={(e) => setHealthReport({...healthReport, eatingHabits: e.target.value})}
-                      >
-                        <option value="normal">Normal</option>
-                        <option value="reduced">Reduced</option>
-                        <option value="increased">Increased</option>
-                        <option value="none">None</option>
-                      </select>
-                    </div>
-
-                    <div className="v-dash-form-group">
-                      <label>Mood/Behavior</label>
-                      <select 
-                        value={healthReport.mood}
-                        onChange={(e) => setHealthReport({...healthReport, mood: e.target.value})}
-                      >
-                        <option value="playful">Playful</option>
-                        <option value="quiet">Quiet</option>
-                        <option value="anxious">Anxious</option>
-                        <option value="aggressive">Aggressive</option>
-                        <option value="depressed">Depressed</option>
-                        <option value="normal">Normal</option>
-                      </select>
-                    </div>
-
-                    <div className="v-dash-form-group">
-                      <label>Weight (kg)</label>
-                      <input 
-                        type="number" 
-                        value={healthReport.weight}
-                        onChange={(e) => setHealthReport({...healthReport, weight: e.target.value})}
-                        placeholder="Enter weight"
-                      />
-                    </div>
-
-                    <div className="v-dash-form-group">
-                      <label>Observations</label>
-                      <textarea 
-                        value={healthReport.observations}
-                        onChange={(e) => setHealthReport({...healthReport, observations: e.target.value})}
-                        placeholder="Enter any observations here..."
-                        rows="3"
-                      />
-                    </div>
-
-                    <div className="v-dash-form-group">
-                      <label>Upload Photos</label>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <button 
-                          type="button"
-                          className="v-dash-secondary-btn"
-                          onClick={() => document.getElementById('health-photo-input').click()}
-                          style={{ 
-                            padding: '12px 16px', 
-                            border: '2px dashed #ccc', 
-                            backgroundColor: '#f9f9f9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            borderRadius: '8px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Upload size={18} />
-                          <span>Choose Photos</span>
-                        </button>
-                        
-                        <input 
-                          id="health-photo-input"
-                          type="file" 
-                          accept="image/*" 
-                          multiple
-                          style={{ display: 'none' }}
-                          onChange={(e) => setHealthReport({...healthReport, photos: Array.from(e.target.files || [])})}
-                        />
-                        
-                        {Array.isArray(healthReport.photos) && healthReport.photos.length > 0 && (
-                          <div style={{ marginTop: '8px' }}>
-                            <small style={{ color: '#666', display: 'block', marginBottom: '8px' }}>
-                              {healthReport.photos.length} photo(s) selected:
-                            </small>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                              {healthReport.photos.map((file, index) => (
-                                <span 
-                                  key={index} 
-                                  style={{ 
-                                    padding: '4px 8px', 
-                                    backgroundColor: '#e3f2fd', 
-                                    borderRadius: '4px', 
-                                    fontSize: '12px',
-                                    color: '#1976d2'
-                                  }}
-                                >
-                                  {file.name}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <button 
-                      className="v-dash-primary-btn"
-                      onClick={() => handleHealthReportSubmit(healthReport.dogId)}
-                      disabled={!healthReport.dogId}
-                      style={{ marginTop: '16px', width: '100%' }}
-                    >
-                      Submit Health Report
-                    </button>
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
-          
-          {/* Walking Tracker Section */}
-          {activeSection === 'walks' && (
-            <section className="v-dash-section">
-              {loading ? (
-                <div className="v-dash-loading">
-                  <p>Loading walking data...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="v-dash-section-header">
-                    <h2>Walking Tracker</h2>
-                    <p>Log and track your dog walking activities</p>
-                  </div>
-                  
-                  <div className="v-dash-walk-stats">
-                    <div className="v-dash-walk-stat">
-                      <h3>{walkingData?.totalDistance !== undefined ? walkingData.totalDistance.toFixed(1) : '0.0'} km</h3>
-                      <p>Total Distance</p>
-                    </div>
-                    
-                    <div className="v-dash-walk-stat">
-                      <h3>{walkingData?.totalDuration || '0h 0m'}</h3>
-                      <p>Total Time</p>
-                    </div>
-                    
-                    <div className="v-dash-walk-stat">
-                      <h3>{walkingData?.uniqueDogs || 0}</h3>
-                      <p>Dogs Walked</p>
-                    </div>
-                    
-                    <div className="v-dash-walk-stat">
-                      <h3>{walkingData?.statistics?.totalWalks || walkingData?.walks?.length || 0}</h3>
-                      <p>Total Walks</p>
-                    </div>
-                  </div>
-              
-              <div className="v-dash-walk-log">
-                <h3>Log a New Walk</h3>
-                <div className="v-dash-walk-form">
-                  {/* Dog Selection */}
-                  <div className="v-dash-form-group">
-                    <label>Select Dog</label>
-                    <select 
-                      value={walkLog.dogId} 
-                      onChange={(e) => setWalkLog({...walkLog, dogId: e.target.value})}
-                      className="v-dash-dog-dropdown"
-                    >
-                      <option value="">Choose a dog</option>
-                      {availableDogs.map(dog => (
-                        <option key={dog._id} value={dog._id}>
-                          {dog.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="v-dash-form-row">
-                    <div className="v-dash-form-group">
-                      <label>Date</label>
-                      <input 
-                        type="date" 
-                        value={walkLog.walkDate}
-                        onChange={(e) => setWalkLog({...walkLog, walkDate: e.target.value})}
-                      />
-                    </div>
-                    
-                    <div className="v-dash-form-group">
-                      <label>Time</label>
-                      <input 
-                        type="time" 
-                        value={walkLog.walkTime}
-                        onChange={(e) => setWalkLog({...walkLog, walkTime: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="v-dash-form-row">
-                    <div className="v-dash-form-group">
-                      <label>Distance (km)</label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={walkLog.distance}
-                        onChange={(e) => setWalkLog({...walkLog, distance: e.target.value})}
-                        placeholder="0.0"
-                      />
-                    </div>
-                    
-                    <div className="v-dash-form-group">
-                      <label>Duration (minutes)</label>
-                      <input 
-                        type="number" 
-                        value={walkLog.duration}
-                        onChange={(e) => setWalkLog({...walkLog, duration: e.target.value})}
-                        placeholder="30"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="v-dash-form-group">
-                    <label>Route/Location</label>
-                    <input 
-                      type="text" 
-                      value={walkLog.route}
-                      onChange={(e) => setWalkLog({...walkLog, route: e.target.value})}
-                      placeholder="e.g., Park trail, neighborhood streets..."
-                    />
-                  </div>
-
-                  <div className="v-dash-form-row">
-                    <div className="v-dash-form-group">
-                      <label>Weather</label>
-                      <select 
-                        value={walkLog.weather}
-                        onChange={(e) => setWalkLog({...walkLog, weather: e.target.value})}
-                      >
-                        <option value="">Select weather</option>
-                        <option value="sunny">Sunny</option>
-                        <option value="cloudy">Cloudy</option>
-                        <option value="rainy">Rainy</option>
-                        <option value="snowy">Snowy</option>
-                        <option value="windy">Windy</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    
-                    <div className="v-dash-form-group">
-                      <label>Walk Quality</label>
-                      <select 
-                        value={walkLog.walkQuality}
-                        onChange={(e) => setWalkLog({...walkLog, walkQuality: e.target.value})}
-                      >
-                        <option value="excellent">Excellent</option>
-                        <option value="good">Good</option>
-                        <option value="fair">Fair</option>
-                        <option value="poor">Poor</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="v-dash-form-group">
-                    <label>Dog Behavior</label>
-                    <select 
-                      value={walkLog.dogBehavior}
-                      onChange={(e) => setWalkLog({...walkLog, dogBehavior: e.target.value})}
-                    >
-                      <option value="calm">Calm</option>
-                      <option value="excited">Excited</option>
-                      <option value="anxious">Anxious</option>
-                      <option value="aggressive">Aggressive</option>
-                      <option value="playful">Playful</option>
-                      <option value="tired">Tired</option>
-                    </select>
-                  </div>
-                  
-                  <div className="v-dash-form-group">
-                    <label>Activities</label>
-                    <div className="v-dash-checkbox-group">
-                      <label className="v-dash-checkbox-item">
-                        <input 
-                          type="checkbox" 
-                          checked={walkLog.activities.includes('exercise')}
-                          onChange={(e) => {
-                            const activities = [...walkLog.activities];
-                            if (e.target.checked) {
-                              activities.push('exercise');
-                            } else {
-                              const index = activities.indexOf('exercise');
-                              if (index > -1) activities.splice(index, 1);
-                            }
-                            setWalkLog({...walkLog, activities});
-                          }}
-                        />
-                        <span>Exercise</span>
-                      </label>
-                      
-                      <label className="v-dash-checkbox-item">
-                        <input 
-                          type="checkbox" 
-                          checked={walkLog.activities.includes('play')}
-                          onChange={(e) => {
-                            const activities = [...walkLog.activities];
-                            if (e.target.checked) {
-                              activities.push('play');
-                            } else {
-                              const index = activities.indexOf('play');
-                              if (index > -1) activities.splice(index, 1);
-                            }
-                            setWalkLog({...walkLog, activities});
-                          }}
-                        />
-                        <span>Play</span>
-                      </label>
-                      
-                      <label className="v-dash-checkbox-item">
-                        <input 
-                          type="checkbox" 
-                          checked={walkLog.activities.includes('training')}
-                          onChange={(e) => {
-                            const activities = [...walkLog.activities];
-                            if (e.target.checked) {
-                              activities.push('training');
-                            } else {
-                              const index = activities.indexOf('training');
-                              if (index > -1) activities.splice(index, 1);
-                            }
-                            setWalkLog({...walkLog, activities});
-                          }}
-                        />
-                        <span>Training</span>
-                      </label>
-                    </div>
-                  </div>
-                  
-                  <div className="v-dash-form-group">
-                    <label>Notes</label>
-                    <textarea 
-                      value={walkLog.notes}
-                      onChange={(e) => setWalkLog({...walkLog, notes: e.target.value})}
-                      placeholder="Any observations during the walk..."
-                    ></textarea>
-                  </div>
                   
                   <button 
-                    className="v-dash-primary-btn"
-                    onClick={handleWalkLog}
+                    className="v-dash-action-btn"
+                    onClick={() => setActiveSection('events')}
                   >
-                    Log Walk
+                    <Calendar size={18} />
+                    <span>View Events</span>
                   </button>
+                  
+                  
                 </div>
               </div>
-              
-              <div className="v-dash-walk-history">
-                <h3>Recent Walks</h3>
-                <div className="v-dash-walk-list">
-                  {walkingData?.recentWalks?.length > 0 ? walkingData.recentWalks.map(walk => (
-                    <div key={walk._id} className="v-dash-walk-item">
-                      <img 
-                        src={
-                          walk.dog?.photo
-                            ? `http://localhost:3000/uploads/dogs/${walk.dog.photo}`
-                            : 'https://placedog.net/300/300?id=1'
-                        } 
-                        alt={walk.dog?.name || 'Dog'} 
-                      />
-                      <div className="v-dash-walk-info">
-                        <h4>{walk.dog?.name || 'Unknown Dog'}</h4>
-                        <div className="v-dash-walk-details">
-                          <p><strong>Distance:</strong> {typeof walk.distance === 'number' ? walk.distance.toFixed(1) : walk.distance}km</p>
-                          <p><strong>Duration:</strong> {walk.duration}</p>
-                          <p><strong>Date:</strong> {new Date(walk.date).toLocaleDateString()}</p>
-                          {walk.route && <p><strong>Route:</strong> {walk.route}</p>}
-                          {walk.weather && <p><strong>Weather:</strong> {walk.weather}</p>}
-                          {walk.walkQuality && <p><strong>Quality:</strong> {walk.walkQuality}</p>}
-                          {walk.dogBehavior && <p><strong>Dog Behavior:</strong> {walk.dogBehavior}</p>}
-                          {walk.activities && walk.activities.length > 0 && (
-                            <p><strong>Activities:</strong> {walk.activities.join(', ')}</p>
-                          )}
-                          {walk.notes && <p><strong>Notes:</strong> {walk.notes}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  )) : (
-                    <p className="v-dash-no-walks">No recent walks found. Start logging your walks!</p>
-                  )}
-                </div>
-              </div>
-                </>
-              )}
             </section>
           )}
+
+          {/* Volunteer Management Section */}
+          {activeSection === 'volunteer-management' && renderVolunteerManagement()}
           
           {/* Events Section */}
           {activeSection === 'events' && (
@@ -2774,9 +3553,7 @@ useEffect(() => {
                   <div key={event._id} className="v-dash-event-card">
                     <div className="v-dash-event-header">
                       <h3>{event.title}</h3>
-                      <div className={`v-dash-event-status ${event.attendees?.includes(userData?.id) ? 'confirmed' : 'pending'}`}>
-                        {event.attendees?.includes(userData?.id) ? 'Confirmed' : 'Not RSVPed'}
-                      </div>
+                      {/* Removed RSVP status display */}
                     </div>
                     
                     <div className="v-dash-event-details">
@@ -2874,6 +3651,7 @@ useEffect(() => {
                 onClick={() => {
                   setShowNewPostForm(!showNewPostForm);
                   setNewBlogPost({ title: '', content: '' }); // Reset form when opening
+                  setFormErrors({});
                 }}
               >
                 <Plus size={18} />
@@ -2891,6 +3669,7 @@ useEffect(() => {
                       onChange={(e) => setNewBlogPost({...newBlogPost, title: e.target.value})}
                       placeholder="Enter a title for your post"
                     />
+                    {formErrors.title && <span className="v-dash-form-error">{formErrors.title}</span>}
                   </div>
                   
                   <div className="v-dash-form-group">
@@ -2901,6 +3680,7 @@ useEffect(() => {
                       placeholder="Write your blog post here..."
                       rows="6"
                     ></textarea>
+                    {formErrors.content && <span className="v-dash-form-error">{formErrors.content}</span>}
                   </div>
                   
                   <div className="v-dash-form-actions">
@@ -2909,6 +3689,7 @@ useEffect(() => {
                       onClick={() => {
                         setShowNewPostForm(false);
                         setNewBlogPost({ title: '', content: '' });
+                        setFormErrors({});
                       }}
                     >
                       Cancel
@@ -2916,9 +3697,10 @@ useEffect(() => {
                     <button 
                       className="v-dash-primary-btn"
                       onClick={handleNewBlogPost}
+                      disabled={isSubmitting}
                     >
                       <Save size={16} />
-                      Submit Post
+                      {isSubmitting ? 'Submitting...' : 'Submit Post'}
                     </button>
                   </div>
                 </div>
@@ -2940,20 +3722,8 @@ useEffect(() => {
                         </p>
                       </div>
                       
-                      <div className={`v-dash-post-status ${(post.status || 'draft').toLowerCase()}`}>
-                        {post.status || 'Draft'}
-                      </div>
-                      
                       <div className="v-dash-post-actions">
-                        <button 
-                          className="v-dash-edit-btn"
-                          onClick={() => handleEditBlogPost(post._id)}
-                          disabled={post.status === 'published'}
-                          title={post.status === 'published' ? 'Published posts cannot be edited' : 'Edit post'}
-                        >
-                          <Edit3 size={14} />
-                          Edit
-                        </button>
+                        {/* Removed Edit button */}
                         <button 
                           className="v-dash-delete-btn"
                           onClick={() => handleDeleteBlogPost(post._id)}

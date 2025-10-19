@@ -627,4 +627,86 @@ const getAllDogs = async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Failed to fetch dogs', error: error.message });
   }
 };
+
+
 module.exports.getAllDogs = getAllDogs;
+
+
+// Update a medical record
+const updateMedicalRecord = async (req, res) => {
+    try {
+        const vetId = req.user._id;
+        const { recordId } = req.params;
+        const updateData = req.body;
+
+        const record = await MedicalRecord.findById(recordId);
+        if (!record) {
+            return res.status(404).json({ status: 'error', message: 'Medical record not found' });
+        }
+
+        // Update record fields
+        if (updateData.title) record.title = updateData.title;
+        if (updateData.description) record.description = updateData.description;
+        
+        if (updateData.treatment) {
+            record.treatment = { ...record.treatment, ...updateData.treatment };
+        }
+        
+        if (updateData.medications) {
+            record.medications = updateData.medications;
+        }
+        
+        if (updateData.vaccination) {
+            record.vaccination = { ...record.vaccination, ...updateData.vaccination };
+        }
+
+        record.updatedAt = new Date();
+        await record.save();
+
+        const populated = await MedicalRecord.findById(record._id)
+            .populate('administeredBy', 'name email role')
+            .populate('dog', 'name breed');
+
+        res.json({
+            status: 'success',
+            message: 'Medical record updated successfully',
+            data: { record: populated }
+        });
+    } catch (error) {
+        console.error('Update medical record error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to update medical record',
+            error: error.message
+        });
+    }
+};
+module.exports.updateMedicalRecord = updateMedicalRecord;
+
+// Delete a medical record
+const deleteMedicalRecord = async (req, res) => {
+    try {
+        const vetId = req.user._id;
+        const { recordId } = req.params;
+
+        const record = await MedicalRecord.findById(recordId);
+        if (!record) {
+            return res.status(404).json({ status: 'error', message: 'Medical record not found' });
+        }
+
+        await MedicalRecord.findByIdAndDelete(recordId);
+
+        res.json({
+            status: 'success',
+            message: 'Medical record deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete medical record error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to delete medical record',
+            error: error.message
+        });
+    }
+};
+module.exports.deleteMedicalRecord = deleteMedicalRecord;

@@ -21,7 +21,8 @@ import {
   Calendar,
   HeartPlus,
   CalendarPlus,
-  UserPlus
+  UserPlus,
+  HandCoins
 } from "lucide-react";
 
 import walkImg from "../../assets/walk.jpg";
@@ -469,6 +470,17 @@ const Home = () => {
       {/* --- Adoption Spotlight --- */}
       <section className="spotlight">
         <h2>Adoption Spotlight <Dog size={50} color="#6f2b83ff" /></h2>
+        {/* QR Code → navigate to DonationPay.js */}
+            <div className="qr-container-i">
+              <p>Scan to See Available Dogs ❤</p>
+              <img
+                src={qr}
+                alt="QR Code"
+                style={{ cursor: "pointer" }}
+
+                
+              />
+            </div><br></br>
         <p className="section-desc"> Give rescued dogs a loving home. Explore some of our adorable dogs below! </p>
         <h3>If you want to browse more dogs, click here.</h3> 
         <button className="btn adopt" onClick={() => { 
@@ -677,12 +689,12 @@ const Home = () => {
           </div>
 
           {/* Right Content */}
-          <div className="donation-content">
+          <div className="donation-content"><br></br>
             <p className="donation-desc">
               Your donations fund rescues, food, medicine, and shelter for
               street dogs. Every contribution saves lives! Let's make tails wag together.
             </p>
-
+<br></br>
             {/* Predefined Amounts */}
             <div className="donation-amounts">
               <button className="amount-btn">Rs. 500</button>
@@ -690,7 +702,7 @@ const Home = () => {
               <button className="amount-btn">Rs. 2500</button>
               <button className="amount-btn custom">Custom</button>
             </div>
-
+<br></br>
             {/* Progress Bar */}
             <div className="progress-container">
               <p>This month's goal: <strong>75% reached!</strong></p>
@@ -698,7 +710,7 @@ const Home = () => {
                 <div className="progress-fill" style={{ width: "75%" }}></div>
               </div>
             </div>
-
+<br></br>
             {/* Donate Button */}
             <button
               className="btn donate"
@@ -707,27 +719,10 @@ const Home = () => {
                 navigate("/donate");
               }}
             >
-              💳 Donate Now
+              <HandCoins size={40} color="#ffffffff"/> Donate Now
             </button>
 
-            {/* QR Code → navigate to DonationPay.js */}
-            <div className="qr-container-i">
-              <p>Scan to Donate ❤</p>
-              <img
-                src={qr}
-                alt="QR Code"
-                style={{ cursor: "pointer" }}
-                onClick={() => {
-                  window.scrollTo({ top: 1000, behavior: "smooth" });
-                  navigate("/donate");
-                }}
-              />
-            </div>
-
-            {/* Note */}
-            <p className="note">
-              💡Your Donations go towards food, shelter, and medical care for rescued dogs.
-            </p>
+         
           </div>
         </div>
       </section>

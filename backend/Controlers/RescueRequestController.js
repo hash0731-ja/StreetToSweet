@@ -381,6 +381,79 @@ const getAvailableDrivers = async (req, res) => {
     }
 };
 
+
+// Update rescue request
+const updateRescueRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+
+        // Transform frontend data to match database schema
+        const transformedData = {
+            'dog.condition': updateData.description,
+            'location.address': updateData.location,
+            priority: updateData.urgency === 'high' ? 'High' : updateData.urgency === 'medium' ? 'Normal' : 'Low',
+            status: updateData.status === 'pending' ? 'Pending Assignment' : 
+                   updateData.status === 'in-progress' ? 'Driver Assigned' : 'Rescued',
+            'assignedDriver.driverName': updateData.assignedTo || null
+        };
+
+        const rescueRequest = await RescueRequest.findByIdAndUpdate(
+            id,
+            { $set: transformedData },
+            { new: true, runValidators: true }
+        );
+
+        if (!rescueRequest) {
+            return res.status(404).json({
+                success: false,
+                message: 'Rescue request not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Rescue request updated successfully',
+            data: rescueRequest
+        });
+    } catch (error) {
+        console.error('Error updating rescue request:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update rescue request',
+            error: error.message
+        });
+    }
+};
+
+// Delete rescue request
+const deleteRescueRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const rescueRequest = await RescueRequest.findByIdAndDelete(id);
+
+        if (!rescueRequest) {
+            return res.status(404).json({
+                success: false,
+                message: 'Rescue request not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Rescue request deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting rescue request:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete rescue request',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createRescueRequest,
     getAllRescueRequests,
@@ -388,5 +461,7 @@ module.exports = {
     updateRescueRequestStatus,
     assignDriverToRequest,
     getMyRescueRequests,
-    getAvailableDrivers
+    getAvailableDrivers,
+    updateRescueRequest,
+    deleteRescueRequest,
 };

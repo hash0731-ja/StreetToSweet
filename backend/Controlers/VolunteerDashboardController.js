@@ -868,6 +868,76 @@ const getAvailableDogs = async (req, res) => {
     }
 };
 
+// Delete health report
+const deleteHealthReport = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const volunteerId = req.user._id;
+
+    const healthReport = await HealthReport.findOne({
+      _id: reportId,
+      volunteerId: volunteerId
+    });
+
+    if (!healthReport) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Health report not found or you do not have permission to delete it'
+      });
+    }
+
+    await HealthReport.findByIdAndDelete(reportId);
+
+    res.json({
+      status: 'success',
+      message: 'Health report deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete health report error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete health report',
+      error: error.message
+    });
+  }
+};
+
+// Delete walk log
+const deleteWalkLog = async (req, res) => {
+  try {
+    const { walkId } = req.params;
+    const volunteerId = req.user._id;
+
+    const walkLog = await WalkingLog.findOne({
+      _id: walkId,
+      volunteerId: volunteerId
+    });
+
+    if (!walkLog) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Walk log not found or you do not have permission to delete it'
+      });
+    }
+
+    await WalkingLog.findByIdAndDelete(walkId);
+
+    res.json({
+      status: 'success',
+      message: 'Walk log deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete walk log error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete walk log',
+      error: error.message
+    });
+  }
+};
+
+
+
 module.exports = {
     getVolunteerDashboard,
     getAssignedTasks,
@@ -883,5 +953,7 @@ module.exports = {
     createBlogPost,
     getVolunteerBlogPosts,
     updateBlogPost,
-    deleteBlogPost
+    deleteBlogPost,
+    deleteWalkLog,
+    deleteHealthReport
 };

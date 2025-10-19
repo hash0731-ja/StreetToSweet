@@ -231,11 +231,23 @@ const DriverDashboard = () => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const [geoDenied, setGeoDenied] = useState(false);
+  const [showEmergencyAlert, setShowEmergencyAlert] = useState(false);
 
   // Load dashboard data on component mount
   useEffect(() => {
     loadDashboardData();
     loadQuickLocations();
+    
+    // Show emergency alert and sound when driver logs in
+    setShowEmergencyAlert(true);
+    playEmergencySound();
+    
+    // Hide emergency alert after 5 seconds
+    const timer = setTimeout(() => {
+      setShowEmergencyAlert(false);
+    }, 5000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const loadDashboardData = async () => {
@@ -306,7 +318,7 @@ const DriverDashboard = () => {
           id: req._id,
           date: new Date(req.completedAt || req.createdAt).toISOString().split('T')[0],
           location: req.location.address,
-          dogId: req.requestId,
+          dogId: `RQ-${Date.now()}`,
           dogName: req.dog.name || 'Unknown',
           status: req.status,
           notes: req.notes || '',
@@ -508,26 +520,77 @@ const DriverDashboard = () => {
   }, []);
 
   const playEmergencySound = () => {
-    // Create emergency alert sound
+    // Create emergency alert sound using Web Audio API
     try {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
       
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // Function to create a single siren sound
+      const createSirenSound = () => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.type = 'siren';
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.5);
+        
+        gainNode.gain.setValueAtTime(0.7, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.5);
+      };
       
-      oscillator.type = 'siren';
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.5);
+      // Play the siren sound repeatedly for 5 seconds
+      createSirenSound(); // Play immediately
       
-      gainNode.gain.setValueAtTime(0.7, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      // Continue playing every 0.6 seconds for 5 seconds
+      let repeatCount = 0;
+      const maxRepeats = 8; // 0.6 seconds interval * 8 = 4.8 seconds + initial = ~5 seconds
       
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.5);
+      const repeatInterval = setInterval(() => {
+        repeatCount++;
+        createSirenSound();
+        
+        if (repeatCount >= maxRepeats) {
+          clearInterval(repeatInterval);
+        }
+      }, 600);
+      
     } catch (e) {
-      console.log('Audio context not supported');
+      console.log('Web Audio API not supported, using fallback sound');
+      // Fallback: Create a simple beep sound using HTML5 Audio
+      try {
+        const emergencyBeep = () => {
+          const context = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = context.createOscillator();
+          const gainNode = context.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(context.destination);
+          
+          oscillator.type = 'sine';
+          oscillator.frequency.value = 800;
+          
+          gainNode.gain.value = 0.5;
+          
+          oscillator.start();
+          
+          setTimeout(() => {
+            oscillator.stop();
+          }, 500);
+        };
+        
+        // Play beep sound repeatedly for 5 seconds
+        emergencyBeep();
+        const beepInterval = setInterval(emergencyBeep, 600);
+        setTimeout(() => clearInterval(beepInterval), 5000);
+        
+      } catch (fallbackError) {
+        console.log('Fallback audio also not supported');
+      }
     }
   };
 
@@ -838,6 +901,18 @@ const DriverDashboard = () => {
   return (
     <div className="dr-driver-dashboard">
       {offlineMode && <div className="dr-offline-indicator">⚠️ Offline Mode - Actions will be synced when connection is restored</div>}
+
+      {/* Emergency Alert Modal */}
+      {showEmergencyAlert && (
+        <div className="dr-emergency-alert-modal">
+          <div className="dr-emergency-alert-content">
+            <div className="dr-emergency-icon">🚨</div>
+            <h2>MISSION STATUS: ACTIVE</h2>
+            <p>Be Prepared to Save Lives</p>
+            <div className="dr-emergency-alert-timer">System initializing...</div>
+          </div>
+        </div>
+      )}
 
       {/* Location Selector Modal */}
       {showLocationSelector && (

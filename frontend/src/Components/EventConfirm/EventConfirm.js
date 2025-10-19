@@ -3,6 +3,8 @@ import { useLocation, useNavigate, Link, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext";
 import "./EventConfirm.css";
+import { FaFacebook, FaTiktok, FaTwitch, FaTwitter, FaWhatsapp } from "react-icons/fa";
+import { Mail } from "lucide-react";
 
 const EventConfirmation = () => {
   const location = useLocation();
@@ -249,13 +251,8 @@ const EventConfirmation = () => {
             </div>
             
             <div className="event-confirm-qr">
-              <div className="event-confirm-qr-code">
-                {/* Placeholder for QR code */}
-                <div className="event-confirm-qr-placeholder">
-                  <i className="fas fa-qrcode"></i>
-                </div>
-              </div>
-              <p className="event-confirm-qr-text">Scan for event entry</p>
+             
+              
             </div>
             
             <div className="event-confirm-email-notice">
@@ -275,27 +272,29 @@ const EventConfirmation = () => {
             <p>Share this event:</p>
             <div className="event-confirm-share-buttons">
               <button 
-                className="event-confirm-share-btn event-confirm-share-facebook"
+                className="event-confirm-share-btn event-confirm-share-facebook "
                 onClick={() => handleShareEvent('facebook')}
-              >
-                <i className="fab fa-facebook-f"></i>
+              ><FaFacebook size={40} color="#ffffff" />
+                <i className="fab fa-facebook-f  "></i>
               </button>
-              <button 
-                className="event-confirm-share-btn event-confirm-share-whatsapp"
-                onClick={() => handleShareEvent('whatsapp')}
-              >
-                <i className="fab fa-whatsapp"></i>
-              </button>
+              <button
+  className="event-confirm-share-btn event-confirm-share-whatsapp"
+  onClick={() => handleShareEvent('whatsapp')}
+>
+  <FaWhatsapp size={40} color="#ffffff" /> {/* ✅ Icon inside the button */}
+  <i className="fab fa-whatsapp"></i>
+</button>
+
               <button 
                 className="event-confirm-share-btn event-confirm-share-email"
-                onClick={() => handleShareEvent('email')}
-              >
-                <i className="fas fa-envelope"></i>
+                onClick={() => handleShareEvent('twitter')}
+              ><FaTwitter size={40} color="#ffffff" />
+                <i className="fas fa-twitter"></i>
               </button>
               <button 
                 className="event-confirm-share-btn event-confirm-share-generic"
                 onClick={() => handleShareEvent()}
-              >
+              ><FaTiktok size={40} color="#ffffff" />
                 <i className="fas fa-share-alt"></i>
               </button>
             </div>

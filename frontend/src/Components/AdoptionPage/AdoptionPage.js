@@ -211,7 +211,7 @@ export default function AdoptionPage() {
     <div className="modal-panel">
       <button className="modal-close" onClick={()=>setSelectedDog(null)}>✕</button>
       <div className="modal-grid">
-        <div className="modal-image"><img src={selectedDog.photo} alt={selectedDog.name}/></div>
+        <div className="modal-image-dog"><img src={selectedDog.photo} alt={selectedDog.name}/></div>
         <div className="modal-info">
           <h3>{selectedDog.name} <span className="id">#{selectedDog.id}</span></h3>
           <p><span>Age: </span>{selectedDog.age}</p> 

@@ -691,7 +691,7 @@ function MyAdoptionDashboard() {
           
           {/* Progress Summary */}
           <div className="followup-progress-summary">
-            <h3>Your Follow-Up Progress</h3>
+            <h3>Your Follow-Up Progress</h3><br></br>
             <div className="progress-stats">
               <div className="progress-stat">
                 <span className="stat-number">{followupReports.length}</span>

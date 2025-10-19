@@ -103,6 +103,16 @@ class RescueRequestAPI {
         return await this.apiCall(`/${id}/status`, 'PUT', { status, notes });
     }
 
+    // Update rescue request
+async updateRescueRequest(id, updateData) {
+    return await this.apiCall(`/${id}`, 'PUT', updateData);
+}
+
+// Delete rescue request
+async deleteRescueRequest(id) {
+    return await this.apiCall(`/${id}`, 'DELETE');
+}
+
     // Assign driver to rescue request
     async assignDriverToRequest(id, driverId, driverName, estimatedArrival = null) {
         return await this.apiCall(`/${id}/assign`, 'PUT', {
@@ -117,5 +127,7 @@ class RescueRequestAPI {
         return await this.apiCall('/drivers');
     }
 }
+
+
 
 export default new RescueRequestAPI();

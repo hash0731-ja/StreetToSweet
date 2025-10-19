@@ -77,6 +77,10 @@ const AdminDashboard = () => {
   const [editingType, setEditingType] = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
 
+  // Validation states
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
@@ -106,6 +110,154 @@ const AdminDashboard = () => {
     healthStatus: "good",
     photo: null
   });
+
+  // Validation functions
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateRequired = (value, fieldName) => {
+    if (!value || value.trim() === '') {
+      return `${fieldName} is required`;
+    }
+    return '';
+  };
+
+  const validateFile = (file, maxSizeMB = 5, allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']) => {
+    if (!file) return '';
+    
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      return `File size must be less than ${maxSizeMB}MB`;
+    }
+    
+    if (!allowedTypes.includes(file.type)) {
+      return 'File must be an image (JPEG, PNG, GIF, WEBP)';
+    }
+    
+    return '';
+  };
+
+  const validateDate = (date, fieldName) => {
+    if (!date) return `${fieldName} is required`;
+    
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      return `${fieldName} cannot be in the past`;
+    }
+    
+    return '';
+  };
+
+  const validateNumber = (value, fieldName, min = 0, max = 10000) => {
+    if (value === '' || value === null || value === undefined) {
+      return `${fieldName} is required`;
+    }
+    
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) {
+      return `${fieldName} must be a number`;
+    }
+    
+    if (numValue < min) {
+      return `${fieldName} must be at least ${min}`;
+    }
+    
+    if (numValue > max) {
+      return `${fieldName} cannot exceed ${max}`;
+    }
+    
+    return '';
+  };
+
+  // Form-specific validation functions
+  const validateUserForm = (userData) => {
+    const errors = {};
+    
+    errors.name = validateRequired(userData.name, 'Name');
+    errors.email = validateRequired(userData.email, 'Email');
+    
+    if (!errors.email && !validateEmail(userData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    return errors;
+  };
+
+  const validateEventForm = (eventData) => {
+    const errors = {};
+    
+    errors.title = validateRequired(eventData.title, 'Event title');
+    errors.date = validateDate(eventData.date, 'Event date');
+    errors.location = validateRequired(eventData.location, 'Event location');
+    errors.attendees = validateNumber(eventData.attendees, 'Attendees', 0, 1000);
+    
+    if (eventData.photo) {
+      errors.photo = validateFile(eventData.photo);
+    }
+    
+    return errors;
+  };
+
+  const validateDogForm = (dogData) => {
+    const errors = {};
+    
+    errors.name = validateRequired(dogData.name, 'Dog name');
+    errors.breed = validateRequired(dogData.breed, 'Breed');
+    errors.age = validateRequired(dogData.age, 'Age');
+    
+    if (dogData.photo) {
+      errors.photo = validateFile(dogData.photo);
+    }
+    
+    return errors;
+  };
+
+  const validateRescueForm = (rescueData) => {
+    const errors = {};
+    
+    errors.location = validateRequired(rescueData.location, 'Location');
+    errors.reportedBy = validateRequired(rescueData.reportedBy, 'Reporter name');
+    
+    return errors;
+  };
+
+  const validateTaskForm = (taskData) => {
+    const errors = {};
+    
+    errors.taskDescription = validateRequired(taskData.taskDescription, 'Task description');
+    errors.scheduledTime = validateRequired(taskData.scheduledTime, 'Scheduled time');
+    
+    if (!taskData.scheduledTime) {
+      errors.scheduledTime = 'Scheduled time is required';
+    } else {
+      const scheduledTime = new Date(taskData.scheduledTime);
+      const now = new Date();
+      if (scheduledTime < now) {
+        errors.scheduledTime = 'Scheduled time cannot be in the past';
+      }
+    }
+    
+    errors.estimatedDuration = validateNumber(taskData.estimatedDuration, 'Estimated duration', 5, 480);
+    
+    return errors;
+  };
+
+  // Clear form errors for a specific field
+  const clearFieldError = (fieldName) => {
+    setFormErrors(prev => ({
+      ...prev,
+      [fieldName]: ''
+    }));
+  };
+
+  // Check if form has errors
+  const hasFormErrors = (errors) => {
+    return Object.values(errors).some(error => error !== '');
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -315,6 +467,11 @@ const fetchVolunteersData = async () => {
 
   const handleAssignDogs = async (volunteerId) => {
     try {
+      if (selectedDogs.length === 0) {
+        alert('Please select at least one dog to assign');
+        return;
+      }
+
       console.log('Assigning dogs to volunteer:', volunteerId);
       console.log('Selected dogs:', selectedDogs);
       console.log('Available dogs:', availableDogs);
@@ -388,6 +545,14 @@ const fetchVolunteersData = async () => {
       return;
     }
 
+    // Validate task data
+    const errors = validateTaskForm(taskData);
+    if (hasFormErrors(errors)) {
+      setFormErrors(errors);
+      alert('Please fix the validation errors before assigning the task.');
+      return;
+    }
+
     try {
       // Create complete task data with proper volunteer reference
       const completeTaskData = {
@@ -447,6 +612,7 @@ const fetchVolunteersData = async () => {
       setVolunteersData(updatedVolunteers);
       setShowAssignTaskModal(false);
       setSelectedVolunteer(null);
+      setFormErrors({});
       
       alert(`Task assigned successfully to ${selectedVolunteer.name}! ${apiSuccess ? '' : '(Local update)'}`);
       
@@ -520,7 +686,17 @@ const fetchVolunteersData = async () => {
 
   const handleUpdate = async () => {
     try {
+      setIsSubmitting(true);
+      
       if (editingType === 'user') {
+        // Validate user data
+        const errors = validateUserForm(editingItem);
+        if (hasFormErrors(errors)) {
+          setFormErrors(errors);
+          setIsSubmitting(false);
+          return;
+        }
+
         // Update user - match your backend API
         await axios.put(`/admin/users/${editingItem.id}`, {
           name: editingItem.name,
@@ -530,6 +706,14 @@ const fetchVolunteersData = async () => {
         });
         setUsers(prev => prev.map(u => u.id === editingItem.id ? editingItem : u));
       } else if (editingType === 'event') {
+        // Validate event data
+        const errors = validateEventForm(editingItem);
+        if (hasFormErrors(errors)) {
+          setFormErrors(errors);
+          setIsSubmitting(false);
+          return;
+        }
+
         // Update event - use the correct endpoint structure
         await axios.put(`/admin/events/${editingItem.id}`, {
           title: editingItem.title,
@@ -540,6 +724,14 @@ const fetchVolunteersData = async () => {
         });
         setEvents(prev => prev.map(e => e.id === editingItem.id ? editingItem : e));
       } else if (editingType === 'rescue') {
+        // Validate rescue data
+        const errors = validateRescueForm(editingItem);
+        if (hasFormErrors(errors)) {
+          setFormErrors(errors);
+          setIsSubmitting(false);
+          return;
+        }
+
         // Update rescue report - use status endpoint
         await axios.put(`/emergency-reports/${editingItem.id}/status`, {
           status: editingItem.status,
@@ -547,6 +739,14 @@ const fetchVolunteersData = async () => {
         });
         setRescueReports(prev => prev.map(r => r.id === editingItem.id ? editingItem : r));
       } else if (editingType === 'dog') {
+        // Validate dog data
+        const errors = validateDogForm(editingItem);
+        if (hasFormErrors(errors)) {
+          setFormErrors(errors);
+          setIsSubmitting(false);
+          return;
+        }
+
         // Update dog - CORRECTED: Use FormData for potential photo upload
         const formData = new FormData();
         formData.append('name', editingItem.name);
@@ -614,6 +814,21 @@ const fetchVolunteersData = async () => {
         alert('Adoption request updated successfully!');
         
       } else if (editingType === 'volunteer') {
+        // Validate volunteer data
+        const errors = {};
+        errors.name = validateRequired(editingItem.name, 'Name');
+        errors.email = validateRequired(editingItem.email, 'Email');
+        
+        if (!errors.email && !validateEmail(editingItem.email)) {
+          errors.email = 'Please enter a valid email address';
+        }
+
+        if (hasFormErrors(errors)) {
+          setFormErrors(errors);
+          setIsSubmitting(false);
+          return;
+        }
+
         // Update volunteer with backend connection
        const updateData = {
         name: editingItem.name,
@@ -655,6 +870,7 @@ const fetchVolunteersData = async () => {
     setShowEditModal(false);
     setEditingItem(null);
     setEditingType('');
+    setFormErrors({});
     
     // Refresh data to ensure consistency
     fetchDashboardData();
@@ -667,6 +883,8 @@ const fetchVolunteersData = async () => {
                         'Failed to update item';
     
     alert(`Update failed: ${errorMessage}`);
+  } finally {
+    setIsSubmitting(false);
   }
 };
 
@@ -798,6 +1016,17 @@ const fetchVolunteersData = async () => {
 
   const handleAddUser = async () => {
   try {
+    // Validate form
+    const errors = validateUserForm(newUser);
+    setFormErrors(errors);
+    
+    if (hasFormErrors(errors)) {
+      alert('Please fix the validation errors before submitting.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     if (editingItem && editingType === 'user') {
       // Update existing user - CORRECTED BACKEND CALL
       const payload = { 
@@ -828,6 +1057,7 @@ const fetchVolunteersData = async () => {
       setNewUser({ name: "", email: "", role: "adopter", status: "active" });
       setEditingItem(null);
       setEditingType('');
+      setFormErrors({});
       alert('User updated successfully!');
       
     } else {
@@ -858,6 +1088,7 @@ const fetchVolunteersData = async () => {
       setUsers(prev => [mapped, ...prev]);
       setShowAddUserModal(false);
       setNewUser({ name: "", email: "", role: "adopter", status: "active" });
+      setFormErrors({});
       alert('User added successfully!');
     }
   } catch (error) {
@@ -867,6 +1098,8 @@ const fetchVolunteersData = async () => {
                         error.message || 
                         'Failed to save user';
     alert(`Operation failed: ${errorMessage}`);
+  } finally {
+    setIsSubmitting(false);
   }
 };
 
@@ -880,6 +1113,17 @@ const fetchVolunteersData = async () => {
 
   const handleAddEvent = async () => {
     try {
+      // Validate form
+      const errors = validateEventForm(newEvent);
+      setFormErrors(errors);
+      
+      if (hasFormErrors(errors)) {
+        alert('Please fix the validation errors before submitting.');
+        return;
+      }
+
+      setIsSubmitting(true);
+
       let res;
       if (newEvent.photo) {
         const form = new FormData();
@@ -914,10 +1158,13 @@ const fetchVolunteersData = async () => {
       setEvents(prev => [mapped, ...prev]);
       setShowAddEventModal(false);
       setNewEvent({ title: "", date: "", location: "", attendees: 0, photo: null });
+      setFormErrors({});
     } catch (e) {
       console.error('Add event failed', e);
       const msg = e.response?.data?.message || e.message || 'Failed to add event';
       alert(`Add event failed: ${msg}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -925,6 +1172,17 @@ const fetchVolunteersData = async () => {
   const handleUpdateEvent = async () => {
     try {
       if (!editingEvent) return;
+
+      // Validate form
+      const errors = validateEventForm(editingEvent);
+      setFormErrors(errors);
+      
+      if (hasFormErrors(errors)) {
+        alert('Please fix the validation errors before submitting.');
+        return;
+      }
+
+      setIsSubmitting(true);
 
       let res;
        if (editingEvent.newPhoto instanceof File) {
@@ -976,6 +1234,7 @@ const fetchVolunteersData = async () => {
 
     setShowEditEventModal(false);
     setEditingEvent(null);
+    setFormErrors({});
     
     alert('Event updated successfully!');
     fetchDashboardData(); // Refresh data
@@ -984,11 +1243,24 @@ const fetchVolunteersData = async () => {
     console.error('Update event failed:', error);
     const msg = error.response?.data?.message || error.message || 'Failed to update event';
     alert(`Update event failed: ${msg}`);
+  } finally {
+    setIsSubmitting(false);
   }
 };
 
   const handleAddRescue = async () => {
     try {
+      // Validate form
+      const errors = validateRescueForm(newRescue);
+      setFormErrors(errors);
+      
+      if (hasFormErrors(errors)) {
+        alert('Please fix the validation errors before submitting.');
+        return;
+      }
+
+      setIsSubmitting(true);
+
       const payload = { description: 'Admin created rescue', location: newRescue.location, urgency: newRescue.urgency, reporterName: newRescue.reportedBy || 'Admin', reporterPhone: 'Not provided' };
       const res = await axios.post('/rescue-requests', payload);
       const r = res.data?.data;
@@ -996,14 +1268,29 @@ const fetchVolunteersData = async () => {
       setRescueReports(prev => [mapped, ...prev]);
       setShowAddRescueModal(false);
       setNewRescue({ location: "", reportedBy: "", status: "pending", urgency: "medium" });
+      setFormErrors({});
     } catch (e) {
       console.error('Add rescue failed', e);
+      alert('Failed to add rescue report. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // CORRECTED: Dog Management Functions
   const handleAddDog = async () => {
     try {
+      // Validate form
+      const errors = validateDogForm(newDog);
+      setFormErrors(errors);
+      
+      if (hasFormErrors(errors)) {
+        alert('Please fix the validation errors before submitting.');
+        return;
+      }
+
+      setIsSubmitting(true);
+
       if (editingItem && editingType === 'dog') {
         // Update existing dog - CORRECTED: Use FormData for photo upload
         const formData = new FormData();
@@ -1045,6 +1332,7 @@ const fetchVolunteersData = async () => {
         setNewDog({ name: "", breed: "", age: "", color: "", tagColor: "blue", status: "rescue", healthStatus: "good", photo: null });
         setEditingItem(null);
         setEditingType('');
+        setFormErrors({});
         alert('Dog updated successfully!');
         
       } else {
@@ -1118,6 +1406,7 @@ const fetchVolunteersData = async () => {
         
         setShowAddDogModal(false);
         setNewDog({ name: "", breed: "", age: "", color: "", tagColor: "blue", status: "rescue", healthStatus: "good", photo: null });
+        setFormErrors({});
         alert('Dog registered successfully!');
       }
     } catch (error) {
@@ -1127,6 +1416,8 @@ const fetchVolunteersData = async () => {
                           error.message || 
                           'Failed to save dog';
       alert(`Operation failed: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1162,26 +1453,37 @@ const renderAddUserModal = () => (
             setEditingItem(null);
             setEditingType('');
             setNewUser({ name: "", email: "", role: "adopter", status: "active" });
+            setFormErrors({});
           }}>×</button>
         </div>
         <div className="admin-modal-body">
           <div className="admin-form-group">
-            <label>Name</label>
+            <label>Name *</label>
             <input 
               type="text" 
               value={newUser.name}
-              onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+              onChange={(e) => {
+                setNewUser({...newUser, name: e.target.value});
+                clearFieldError('name');
+              }}
               placeholder="Enter user name"
+              className={formErrors.name ? 'error' : ''}
             />
+            {formErrors.name && <span className="error-message">{formErrors.name}</span>}
           </div>
           <div className="admin-form-group">
-            <label>Email</label>
+            <label>Email *</label>
             <input 
               type="email" 
               value={newUser.email}
-              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+              onChange={(e) => {
+                setNewUser({...newUser, email: e.target.value});
+                clearFieldError('email');
+              }}
               placeholder="Enter user email"
+              className={formErrors.email ? 'error' : ''}
             />
+            {formErrors.email && <span className="error-message">{formErrors.email}</span>}
           </div>
           <div className="admin-form-group">
             <label>Role</label>
@@ -1213,9 +1515,12 @@ const renderAddUserModal = () => (
             setEditingItem(null);
             setEditingType('');
             setNewUser({ name: "", email: "", role: "adopter", status: "active" });
-          }}>Cancel</button>
-          <button className="admin-btn primary" onClick={handleAddUser}>
-            {editingItem && editingType === 'user' ? 'Update User' : 'Add User'}
+            setFormErrors({});
+          }} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button className="admin-btn primary" onClick={handleAddUser} disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : (editingItem && editingType === 'user' ? 'Update User' : 'Add User')}
           </button>
         </div>
       </div>
@@ -1227,51 +1532,89 @@ const renderAddUserModal = () => (
       <div className="admin-modal">
         <div className="admin-modal-header">
           <h3>Add New Event</h3>
-          <button onClick={() => setShowAddEventModal(false)}>×</button>
+          <button onClick={() => {
+            setShowAddEventModal(false);
+            setFormErrors({});
+          }}>×</button>
         </div>
         <div className="admin-modal-body">
           <div className="admin-form-group">
-            <label>Event Title</label>
+            <label>Event Title *</label>
             <input 
               type="text" 
               value={newEvent.title}
-              onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+              onChange={(e) => {
+                setNewEvent({...newEvent, title: e.target.value});
+                clearFieldError('title');
+              }}
               placeholder="Enter event title"
+              className={formErrors.title ? 'error' : ''}
             />
+            {formErrors.title && <span className="error-message">{formErrors.title}</span>}
           </div>
           <div className="admin-form-group">
-            <label>Date</label>
+            <label>Date *</label>
             <input 
               type="date" 
               value={newEvent.date}
-              onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
+              onChange={(e) => {
+                setNewEvent({...newEvent, date: e.target.value});
+                clearFieldError('date');
+              }}
+              className={formErrors.date ? 'error' : ''}
             />
+            {formErrors.date && <span className="error-message">{formErrors.date}</span>}
           </div>
           <div className="admin-form-group">
-            <label>Location</label>
+            <label>Location *</label>
             <input 
               type="text" 
               value={newEvent.location}
-              onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
+              onChange={(e) => {
+                setNewEvent({...newEvent, location: e.target.value});
+                clearFieldError('location');
+              }}
               placeholder="Enter event location"
+              className={formErrors.location ? 'error' : ''}
             />
+            {formErrors.location && <span className="error-message">{formErrors.location}</span>}
           </div>
           <div className="admin-form-group">
             <label>Expected Attendees</label>
             <input 
               type="number" 
               value={newEvent.attendees}
-              onChange={(e) => setNewEvent({...newEvent, attendees: parseInt(e.target.value) || 0})}
+              onChange={(e) => {
+                setNewEvent({...newEvent, attendees: parseInt(e.target.value) || 0});
+                clearFieldError('attendees');
+              }}
               placeholder="Enter number of attendees"
+              className={formErrors.attendees ? 'error' : ''}
+              min="0"
+              max="1000"
             />
+            {formErrors.attendees && <span className="error-message">{formErrors.attendees}</span>}
           </div>
           <div className="admin-form-group">
             <label>Event Cover Image</label>
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setNewEvent({ ...newEvent, photo: e.target.files && e.target.files[0] })}
+              onChange={(e) => {
+                const file = e.target.files && e.target.files[0];
+                setNewEvent({ ...newEvent, photo: file });
+                if (file) {
+                  const error = validateFile(file);
+                  if (error) {
+                    setFormErrors({...formErrors, photo: error});
+                  } else {
+                    clearFieldError('photo');
+                  }
+                }
+              }}
+              className={formErrors.photo ? 'error' : ''}
             />
+            {formErrors.photo && <span className="error-message">{formErrors.photo}</span>}
             {newEvent.photo && (
               <div className="image-preview" style={{ marginTop: '10px' }}>
                 <img
@@ -1284,8 +1627,15 @@ const renderAddUserModal = () => (
           </div>
         </div>
         <div className="admin-modal-footer">
-          <button className="admin-btn" onClick={() => setShowAddEventModal(false)}>Cancel</button>
-          <button className="admin-btn primary" onClick={handleAddEvent}>Add Event</button>
+          <button className="admin-btn" onClick={() => {
+            setShowAddEventModal(false);
+            setFormErrors({});
+          }} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button className="admin-btn primary" onClick={handleAddEvent} disabled={isSubmitting}>
+            {isSubmitting ? 'Adding...' : 'Add Event'}
+          </button>
         </div>
       </div>
     </div>
@@ -1297,7 +1647,10 @@ const renderAddUserModal = () => (
     <div className="admin-modal">
       <div className="admin-modal-header">
         <h3>Edit Event</h3>
-        <button onClick={() => setShowEditEventModal(false)}>×</button>
+        <button onClick={() => {
+          setShowEditEventModal(false);
+          setFormErrors({});
+        }}>×</button>
       </div>
       <div className="admin-modal-body">
         <div className="admin-form-group">
@@ -1305,39 +1658,60 @@ const renderAddUserModal = () => (
           <input 
             type="text" 
             value={editingEvent?.title || ''}
-            onChange={(e) => setEditingEvent({...editingEvent, title: e.target.value})}
+            onChange={(e) => {
+              setEditingEvent({...editingEvent, title: e.target.value});
+              clearFieldError('title');
+            }}
             placeholder="Enter event title"
+            className={formErrors.title ? 'error' : ''}
             required
           />
+          {formErrors.title && <span className="error-message">{formErrors.title}</span>}
         </div>
         <div className="admin-form-group">
           <label>Date *</label>
           <input 
             type="date" 
             value={editingEvent?.date || ''}
-            onChange={(e) => setEditingEvent({...editingEvent, date: e.target.value})}
+            onChange={(e) => {
+              setEditingEvent({...editingEvent, date: e.target.value});
+              clearFieldError('date');
+            }}
+            className={formErrors.date ? 'error' : ''}
             required
           />
+          {formErrors.date && <span className="error-message">{formErrors.date}</span>}
         </div>
         <div className="admin-form-group">
           <label>Location *</label>
           <input 
             type="text" 
             value={editingEvent?.location || ''}
-            onChange={(e) => setEditingEvent({...editingEvent, location: e.target.value})}
+            onChange={(e) => {
+              setEditingEvent({...editingEvent, location: e.target.value});
+              clearFieldError('location');
+            }}
             placeholder="Enter event location"
+            className={formErrors.location ? 'error' : ''}
             required
           />
+          {formErrors.location && <span className="error-message">{formErrors.location}</span>}
         </div>
         <div className="admin-form-group">
           <label>Expected Attendees</label>
           <input 
             type="number" 
             value={editingEvent?.attendees || 0}
-            onChange={(e) => setEditingEvent({...editingEvent, attendees: parseInt(e.target.value) || 0})}
+            onChange={(e) => {
+              setEditingEvent({...editingEvent, attendees: parseInt(e.target.value) || 0});
+              clearFieldError('attendees');
+            }}
             placeholder="Enter number of attendees"
+            className={formErrors.attendees ? 'error' : ''}
             min="0"
+            max="1000"
           />
+          {formErrors.attendees && <span className="error-message">{formErrors.attendees}</span>}
         </div>
         <div className="admin-form-group">
           <label>Status</label>
@@ -1356,11 +1730,24 @@ const renderAddUserModal = () => (
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => setEditingEvent({ 
-              ...editingEvent, 
-              newPhoto: e.target.files && e.target.files[0] 
-            })}
+            onChange={(e) => {
+              const file = e.target.files && e.target.files[0];
+              setEditingEvent({ 
+                ...editingEvent, 
+                newPhoto: file 
+              });
+              if (file) {
+                const error = validateFile(file);
+                if (error) {
+                  setFormErrors({...formErrors, photo: error});
+                } else {
+                  clearFieldError('photo');
+                }
+              }
+            }}
+            className={formErrors.photo ? 'error' : ''}
           />
+          {formErrors.photo && <span className="error-message">{formErrors.photo}</span>}
           <div className="image-preview-container" style={{ marginTop: '10px' }}>
             {editingEvent?.newPhoto ? (
               <div className="image-preview">
@@ -1397,13 +1784,18 @@ const renderAddUserModal = () => (
         </div>
       </div>
       <div className="admin-modal-footer">
-        <button className="admin-btn" onClick={() => setShowEditEventModal(false)}>Cancel</button>
+        <button className="admin-btn" onClick={() => {
+          setShowEditEventModal(false);
+          setFormErrors({});
+        }} disabled={isSubmitting}>
+          Cancel
+        </button>
         <button 
           className="admin-btn primary" 
           onClick={handleUpdateEvent}
-          disabled={!editingEvent?.title || !editingEvent?.date || !editingEvent?.location}
+          disabled={!editingEvent?.title || !editingEvent?.date || !editingEvent?.location || isSubmitting}
         >
-          Update Event
+          {isSubmitting ? 'Updating...' : 'Update Event'}
         </button>
       </div>
     </div>
@@ -1415,26 +1807,39 @@ const renderAddUserModal = () => (
       <div className="admin-modal">
         <div className="admin-modal-header">
           <h3>Add New Rescue Report</h3>
-          <button onClick={() => setShowAddRescueModal(false)}>×</button>
+          <button onClick={() => {
+            setShowAddRescueModal(false);
+            setFormErrors({});
+          }}>×</button>
         </div>
         <div className="admin-modal-body">
           <div className="admin-form-group">
-            <label>Location</label>
+            <label>Location *</label>
             <input 
               type="text" 
               value={newRescue.location}
-              onChange={(e) => setNewRescue({...newRescue, location: e.target.value})}
+              onChange={(e) => {
+                setNewRescue({...newRescue, location: e.target.value});
+                clearFieldError('location');
+              }}
               placeholder="Enter rescue location"
+              className={formErrors.location ? 'error' : ''}
             />
+            {formErrors.location && <span className="error-message">{formErrors.location}</span>}
           </div>
           <div className="admin-form-group">
-            <label>Reported By</label>
+            <label>Reported By *</label>
             <input 
               type="text" 
               value={newRescue.reportedBy}
-              onChange={(e) => setNewRescue({...newRescue, reportedBy: e.target.value})}
+              onChange={(e) => {
+                setNewRescue({...newRescue, reportedBy: e.target.value});
+                clearFieldError('reportedBy');
+              }}
               placeholder="Enter reporter name"
+              className={formErrors.reportedBy ? 'error' : ''}
             />
+            {formErrors.reportedBy && <span className="error-message">{formErrors.reportedBy}</span>}
           </div>
           <div className="admin-form-group">
             <label>Urgency</label>
@@ -1460,14 +1865,21 @@ const renderAddUserModal = () => (
           </div>
         </div>
         <div className="admin-modal-footer">
-          <button className="admin-btn" onClick={() => setShowAddRescueModal(false)}>Cancel</button>
-          <button className="admin-btn primary" onClick={handleAddRescue}>Add Rescue Report</button>
+          <button className="admin-btn" onClick={() => {
+            setShowAddRescueModal(false);
+            setFormErrors({});
+          }} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button className="admin-btn primary" onClick={handleAddRescue} disabled={isSubmitting}>
+            {isSubmitting ? 'Adding...' : 'Add Rescue Report'}
+          </button>
         </div>
       </div>
     </div>
   );
 
-  // CORRECTED: Add/Edit Dog Modal with proper photo handling
+  // CORRECTED: Add/Edit Dog Modal with proper photo handling and validation
   const renderAddDogModal = () => (
     <div className="admin-modal-overlay">
       <div className="admin-modal">
@@ -1478,6 +1890,7 @@ const renderAddUserModal = () => (
             setEditingItem(null);
             setEditingType('');
             setNewDog({ name: "", breed: "", age: "", color: "", tagColor: "blue", status: "rescue", healthStatus: "good", photo: null });
+            setFormErrors({});
           }}>×</button>
         </div>
         <div className="admin-modal-body">
@@ -1486,30 +1899,45 @@ const renderAddUserModal = () => (
             <input 
               type="text" 
               value={newDog.name}
-              onChange={(e) => setNewDog({...newDog, name: e.target.value})}
+              onChange={(e) => {
+                setNewDog({...newDog, name: e.target.value});
+                clearFieldError('name');
+              }}
               placeholder="Enter dog name"
+              className={formErrors.name ? 'error' : ''}
               required
             />
+            {formErrors.name && <span className="error-message">{formErrors.name}</span>}
           </div>
           <div className="admin-form-group">
             <label>Breed *</label>
             <input 
               type="text" 
               value={newDog.breed}
-              onChange={(e) => setNewDog({...newDog, breed: e.target.value})}
+              onChange={(e) => {
+                setNewDog({...newDog, breed: e.target.value});
+                clearFieldError('breed');
+              }}
               placeholder="Enter breed"
+              className={formErrors.breed ? 'error' : ''}
               required
             />
+            {formErrors.breed && <span className="error-message">{formErrors.breed}</span>}
           </div>
           <div className="admin-form-group">
             <label>Age *</label>
             <input 
               type="text" 
               value={newDog.age}
-              onChange={(e) => setNewDog({...newDog, age: e.target.value})}
+              onChange={(e) => {
+                setNewDog({...newDog, age: e.target.value});
+                clearFieldError('age');
+              }}
               placeholder="Enter age (e.g., 2 years, 5 months)"
+              className={formErrors.age ? 'error' : ''}
               required
             />
+            {formErrors.age && <span className="error-message">{formErrors.age}</span>}
           </div>
           <div className="admin-form-group">
             <label>Tag Color</label>
@@ -1556,23 +1984,21 @@ const renderAddUserModal = () => (
               onChange={(e) => {
                 const file = e.target.files[0];
                 if (file) {
-                  // Validate file size (max 5MB)
-                  if (file.size > 5 * 1024 * 1024) {
-                    alert('File size too large. Please select an image under 5MB.');
-                    e.target.value = '';
-                    return;
-                  }
-                  // Validate file type
-                  if (!file.type.startsWith('image/')) {
-                    alert('Please select a valid image file.');
+                  // Validate file
+                  const error = validateFile(file);
+                  if (error) {
+                    setFormErrors({...formErrors, photo: error});
                     e.target.value = '';
                     return;
                   }
                   setNewDog({...newDog, photo: file});
+                  clearFieldError('photo');
                 }
               }}
+              className={formErrors.photo ? 'error' : ''}
             />
-            <small>Supported formats: JPG, PNG, GIF. Max size: 5MB</small>
+            {formErrors.photo && <span className="error-message">{formErrors.photo}</span>}
+            <small>Supported formats: JPG, PNG, GIF, WEBP. Max size: 5MB</small>
             
             {/* Photo preview */}
             {newDog.photo && (
@@ -1593,7 +2019,10 @@ const renderAddUserModal = () => (
                 <button 
                   type="button"
                   className="admin-btn secondary"
-                  onClick={() => setNewDog({...newDog, photo: null})}
+                  onClick={() => {
+                    setNewDog({...newDog, photo: null});
+                    clearFieldError('photo');
+                  }}
                   style={{ marginTop: '5px', fontSize: '12px', padding: '5px 10px' }}
                 >
                   Remove Photo
@@ -1629,13 +2058,16 @@ const renderAddUserModal = () => (
             setEditingItem(null);
             setEditingType('');
             setNewDog({ name: "", breed: "", age: "", color: "", tagColor: "blue", status: "rescue", healthStatus: "good", photo: null });
-          }}>Cancel</button>
+            setFormErrors({});
+          }} disabled={isSubmitting}>
+            Cancel
+          </button>
           <button 
             className="admin-btn primary" 
             onClick={handleAddDog}
-            disabled={!newDog.name || !newDog.breed || !newDog.age}
+            disabled={!newDog.name || !newDog.breed || !newDog.age || isSubmitting}
           >
-            {editingItem && editingType === 'dog' ? 'Update Dog' : 'Register Dog'}
+            {isSubmitting ? 'Saving...' : (editingItem && editingType === 'dog' ? 'Update Dog' : 'Register Dog')}
           </button>
         </div>
       </div>
@@ -1652,7 +2084,12 @@ const renderAddUserModal = () => (
         </div>
         <div className="admin-modal-body">
           <div className="admin-form-group">
-            <label>Select Dogs to Assign</label>
+            <label>Select Dogs to Assign *</label>
+            {availableDogs.length === 0 && (
+              <div className="no-dogs-available">
+                <p>No available dogs found for assignment.</p>
+              </div>
+            )}
             <div className="dogs-selection-grid">
               {availableDogs.map(dog => (
                 <div key={dog._id || dog.id} className="dog-selection-card">
@@ -1711,7 +2148,10 @@ const renderAddUserModal = () => (
       <div className="admin-modal">
         <div className="admin-modal-header">
           <h3>Assign Task to {selectedVolunteer?.name}</h3>
-          <button onClick={() => setShowAssignTaskModal(false)}>×</button>
+          <button onClick={() => {
+            setShowAssignTaskModal(false);
+            setFormErrors({});
+          }}>×</button>
         </div>
         <div className="admin-modal-body">
           <div className="admin-form-group">
@@ -1732,8 +2172,9 @@ const renderAddUserModal = () => (
             </select>
           </div>
           <div className="admin-form-group">
-            <label>Task Type</label>
-            <select id="taskType">
+            <label>Task Type *</label>
+            <select id="taskType" required>
+              <option value="">Select task type</option>
               <option value="feeding">Feeding</option>
               <option value="walking">Walking</option>
               <option value="grooming">Grooming</option>
@@ -1745,16 +2186,28 @@ const renderAddUserModal = () => (
             </select>
           </div>
           <div className="admin-form-group">
-            <label>Description</label>
-            <textarea id="taskDescription" placeholder="Describe the task..."></textarea>
+            <label>Description *</label>
+            <textarea 
+              id="taskDescription" 
+              placeholder="Describe the task..."
+              className={formErrors.taskDescription ? 'error' : ''}
+              required
+            ></textarea>
+            {formErrors.taskDescription && <span className="error-message">{formErrors.taskDescription}</span>}
           </div>
           <div className="admin-form-group">
-            <label>Scheduled Time</label>
-            <input type="datetime-local" id="taskScheduledTime" />
+            <label>Scheduled Time *</label>
+            <input 
+              type="datetime-local" 
+              id="taskScheduledTime" 
+              className={formErrors.scheduledTime ? 'error' : ''}
+              required
+            />
+            {formErrors.scheduledTime && <span className="error-message">{formErrors.scheduledTime}</span>}
           </div>
           <div className="admin-form-group">
             <label>Priority</label>
-            <select id="taskPriority">
+            <select id="taskPriority" required>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -1762,12 +2215,24 @@ const renderAddUserModal = () => (
             </select>
           </div>
           <div className="admin-form-group">
-            <label>Estimated Duration (minutes)</label>
-            <input type="number" id="taskDuration" defaultValue="30" min="5" max="480" />
+            <label>Estimated Duration (minutes) *</label>
+            <input 
+              type="number" 
+              id="taskDuration" 
+              defaultValue="30" 
+              min="5" 
+              max="480" 
+              className={formErrors.estimatedDuration ? 'error' : ''}
+              required
+            />
+            {formErrors.estimatedDuration && <span className="error-message">{formErrors.estimatedDuration}</span>}
           </div>
         </div>
         <div className="admin-modal-footer">
-          <button className="admin-btn" onClick={() => setShowAssignTaskModal(false)}>
+          <button className="admin-btn" onClick={() => {
+            setShowAssignTaskModal(false);
+            setFormErrors({});
+          }}>
             Cancel
           </button>
           <button className="admin-btn primary" onClick={() => {
@@ -1994,23 +2459,38 @@ const renderAddUserModal = () => (
       <div className="admin-modal large">
         <div className="admin-modal-header">
           <h3>Edit {editingType}</h3>
-          <button onClick={() => setShowEditModal(false)}>×</button>
+          <button onClick={() => {
+            setShowEditModal(false);
+            setFormErrors({});
+          }}>×</button>
         </div>
         <div className="admin-modal-body">
           {editingItem && editingType === 'user' && (
             <div className="admin-form-group">
-              <label>Name</label>
+              <label>Name *</label>
               <input 
                 type="text" 
                 value={editingItem.name || ''}
-                onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, name: e.target.value});
+                  clearFieldError('name');
+                }}
+                className={formErrors.name ? 'error' : ''}
               />
-              <label>Email</label>
+              {formErrors.name && <span className="error-message">{formErrors.name}</span>}
+              
+              <label>Email *</label>
               <input 
                 type="email" 
                 value={editingItem.email || ''}
-                onChange={(e) => setEditingItem({...editingItem, email: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, email: e.target.value});
+                  clearFieldError('email');
+                }}
+                className={formErrors.email ? 'error' : ''}
               />
+              {formErrors.email && <span className="error-message">{formErrors.email}</span>}
+              
               <label>Role</label>
               <select 
                 value={editingItem.role || ''}
@@ -2021,6 +2501,7 @@ const renderAddUserModal = () => (
                 <option value="vet">Veterinarian</option>
                 <option value="driver">Rescue Driver</option>
               </select>
+              
               <label>Status</label>
               <select 
                 value={editingItem.status || ''}
@@ -2034,18 +2515,30 @@ const renderAddUserModal = () => (
           
           {editingItem && editingType === 'rescue' && (
             <div className="admin-form-group">
-              <label>Location</label>
+              <label>Location *</label>
               <input 
                 type="text" 
                 value={editingItem.location || ''}
-                onChange={(e) => setEditingItem({...editingItem, location: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, location: e.target.value});
+                  clearFieldError('location');
+                }}
+                className={formErrors.location ? 'error' : ''}
               />
-              <label>Reported By</label>
+              {formErrors.location && <span className="error-message">{formErrors.location}</span>}
+              
+              <label>Reported By *</label>
               <input 
                 type="text" 
                 value={editingItem.reportedBy || ''}
-                onChange={(e) => setEditingItem({...editingItem, reportedBy: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, reportedBy: e.target.value});
+                  clearFieldError('reportedBy');
+                }}
+                className={formErrors.reportedBy ? 'error' : ''}
               />
+              {formErrors.reportedBy && <span className="error-message">{formErrors.reportedBy}</span>}
+              
               <label>Urgency</label>
               <select 
                 value={editingItem.urgency || ''}
@@ -2055,6 +2548,7 @@ const renderAddUserModal = () => (
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </select>
+              
               <label>Status</label>
               <select 
                 value={editingItem.status || ''}
@@ -2071,24 +2565,42 @@ const renderAddUserModal = () => (
           
           {editingItem && editingType === 'dog' && (
             <div className="admin-form-group">
-              <label>Name</label>
+              <label>Name *</label>
               <input 
                 type="text" 
                 value={editingItem.name || ''}
-                onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, name: e.target.value});
+                  clearFieldError('name');
+                }}
+                className={formErrors.name ? 'error' : ''}
               />
-              <label>Breed</label>
+              {formErrors.name && <span className="error-message">{formErrors.name}</span>}
+              
+              <label>Breed *</label>
               <input 
                 type="text" 
                 value={editingItem.breed || ''}
-                onChange={(e) => setEditingItem({...editingItem, breed: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, breed: e.target.value});
+                  clearFieldError('breed');
+                }}
+                className={formErrors.breed ? 'error' : ''}
               />
-              <label>Age</label>
+              {formErrors.breed && <span className="error-message">{formErrors.breed}</span>}
+              
+              <label>Age *</label>
               <input 
                 type="text" 
                 value={editingItem.age || ''}
-                onChange={(e) => setEditingItem({...editingItem, age: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, age: e.target.value});
+                  clearFieldError('age');
+                }}
+                className={formErrors.age ? 'error' : ''}
               />
+              {formErrors.age && <span className="error-message">{formErrors.age}</span>}
+              
               <label>Health Status</label>
               <select 
                 value={editingItem.healthStatus || ''}
@@ -2099,6 +2611,7 @@ const renderAddUserModal = () => (
                 <option value="good">Good</option>
                 <option value="excellent">Excellent</option>
               </select>
+              
               <label>Status</label>
               <select 
                 value={editingItem.status || ''}
@@ -2125,13 +2638,34 @@ const renderAddUserModal = () => (
                 type="text" 
                 value={editingItem.dogName || ''}
                 onChange={(e) => setEditingItem({...editingItem, dogName: e.target.value})}
+                
               />
-              <label>Date</label>
-              <input 
-                type="date" 
-                value={editingItem.date || ''}
-                onChange={(e) => setEditingItem({...editingItem, date: e.target.value})}
-              />
+              {/* Add dog selection dropdown if you want to change the actual dog */}
+    <label>Select Dog</label>
+    <select 
+      value={editingItem.dogId || ''}
+      onChange={(e) => {
+        const selectedDogId = e.target.value;
+        const selectedDog = dogs.find(dog => dog.id === selectedDogId);
+        setEditingItem({
+          ...editingItem, 
+          dogId: selectedDogId,
+          dogName: selectedDog ? selectedDog.name : editingItem.dogName
+        });
+      }}
+    >
+      <option value="">Select a dog</option>
+      {dogs
+        .filter(dog => dog.status === 'adoption' || dog.id === editingItem.dogId)
+        .map(dog => (
+          <option key={dog.id} value={dog.id}>
+            {dog.name} ({dog.breed})
+          </option>
+        ))
+      }
+    </select>
+
+
               <label>Status</label>
               <select 
                 value={editingItem.status || ''}
@@ -2147,18 +2681,30 @@ const renderAddUserModal = () => (
           
           {editingItem && editingType === 'volunteer' && (
             <div className="admin-form-group">
-              <label>Name</label>
+              <label>Name *</label>
               <input 
                 type="text" 
                 value={editingItem.name || ''}
-                onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, name: e.target.value});
+                  clearFieldError('name');
+                }}
+                className={formErrors.name ? 'error' : ''}
               />
-              <label>Email</label>
+              {formErrors.name && <span className="error-message">{formErrors.name}</span>}
+              
+              <label>Email *</label>
               <input 
                 type="email" 
                 value={editingItem.email || ''}
-                onChange={(e) => setEditingItem({...editingItem, email: e.target.value})}
+                onChange={(e) => {
+                  setEditingItem({...editingItem, email: e.target.value});
+                  clearFieldError('email');
+                }}
+                className={formErrors.email ? 'error' : ''}
               />
+              {formErrors.email && <span className="error-message">{formErrors.email}</span>}
+              
               <label>Phone</label>
               <input 
                 type="text" 
@@ -2166,6 +2712,7 @@ const renderAddUserModal = () => (
                 onChange={(e) => setEditingItem({...editingItem, phone: e.target.value})}
                 placeholder="Enter phone number"
               />
+              
               <label>Status</label>
               <select 
                 value={editingItem.status || ''}
@@ -2176,6 +2723,7 @@ const renderAddUserModal = () => (
                 <option value="pending">Pending</option>
                 <option value="suspended">Suspended</option>
               </select>
+              
               <label>Completed Tasks</label>
               <input 
                 type="number" 
@@ -2183,6 +2731,7 @@ const renderAddUserModal = () => (
                 onChange={(e) => setEditingItem({...editingItem, completedTasks: parseInt(e.target.value) || 0})}
                 min="0"
               />
+              
               <div className="assigned-items-section">
                 <label>Assigned Dogs ({editingItem.assignedDogs?.length || 0})</label>
                 <div className="assigned-items-list">
@@ -2216,6 +2765,7 @@ const renderAddUserModal = () => (
                   ))}
                 </div>
               </div>
+              
               <div className="assigned-items-section">
                 <label>Assigned Tasks ({editingItem.assignedTasks?.length || 0})</label>
                 <div className="assigned-items-list">
@@ -2252,8 +2802,15 @@ const renderAddUserModal = () => (
           )}
         </div>
         <div className="admin-modal-footer">
-          <button className="admin-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
-          <button className="admin-btn primary" onClick={handleUpdate}>Update</button>
+          <button className="admin-btn" onClick={() => {
+            setShowEditModal(false);
+            setFormErrors({});
+          }} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button className="admin-btn primary" onClick={handleUpdate} disabled={isSubmitting}>
+            {isSubmitting ? 'Updating...' : 'Update'}
+          </button>
         </div>
       </div>
     </div>

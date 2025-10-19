@@ -15,7 +15,9 @@ const {
     logTreatment,
     addVaccination,
     certifyHealth,
-    generateDogPdfReport
+    generateDogPdfReport,
+    updateMedicalRecord,
+    deleteMedicalRecord
     
 } = require('../Controlers/VetController');
 const { authenticateToken, authorizeRoles, requireVet } = require('../middleware/auth');
@@ -53,6 +55,14 @@ router.get('/dogs', authorizeRoles('vet','admin'), getAllDogs);
 // All vet-related adoption routes
 router.get('/adoption-requests/pending', authenticateToken, authorizeRoles('vet', 'admin'), AdoptionRequestController.getPendingAdoptionRequests);
 router.post('/adoption-requests/:id/review', authenticateToken, authorizeRoles('vet', 'admin'), AdoptionRequestController.vetReviewAdoptionRequest);
+
+// Update medical record
+router.put('/medical-records/:recordId', authenticateToken, authorizeRoles('vet', 'admin'), updateMedicalRecord);
+
+// Delete medical record  
+router.delete('/medical-records/:recordId', authenticateToken, authorizeRoles('vet', 'admin'), deleteMedicalRecord);
+
+
 
 
 // Route: POST /vet/dogs/:id/certify

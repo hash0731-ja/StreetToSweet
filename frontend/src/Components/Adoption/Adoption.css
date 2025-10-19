@@ -760,7 +760,7 @@
 
 /* FAQ Item Styles */
 .faq-item {
-  background-image: radial-gradient( circle 321px at 8.3% 75.7%,  rgba(209,247,241,1) 0%, rgba(249,213,213,1) 81% );
+  background-image: radial-gradient( circle 321px at 8.3% 75.7%,  rgb(168, 253, 240) 0%, rgb(253, 211, 211) 81% );
   margin: 15px auto;
   padding: 18px 20px;
   border-radius: 12px;

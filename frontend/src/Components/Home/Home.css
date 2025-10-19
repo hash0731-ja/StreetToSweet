@@ -646,6 +646,7 @@
   color: #5a4b4b;
   line-height: 1.7;
   margin-bottom: 25px;
+  text-align: center;
 }
 
 /* Predefined Amount Buttons */
@@ -653,6 +654,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 15px;
+  justify-content: center; /* ✅ Centers buttons horizontally */
   margin-bottom: 25px;
 }
 
@@ -681,6 +683,7 @@
 /* Progress Bar */
 .progress-container {
   margin-bottom: 25px;
+  text-align: center; /* ✅ Centers progress bar */
 }
 
 .progress-bar {
@@ -688,6 +691,8 @@
   border-radius: 15px;
   overflow: hidden;
   height: 22px;
+  width: 80%; /* ✅ Control width */
+  margin: 0 auto; /* ✅ Center horizontally */
 }
 
 .progress-fill {
@@ -700,7 +705,7 @@
 /* Donate Button */
 .btn.donate {
   display: block;
-  margin: 20px 0;
+  margin: 20px auto; /* ✅ Center the donate button */
   padding: 16px 40px;
   border: none;
   border-radius: 25px;
@@ -714,20 +719,11 @@
 
 .btn.donate:hover {
   transform: scale(1.05);
-  box-shadow: 0 12px 35px rgba(252,92,125,0.5);
+  box-shadow: 0 12px 35px rgba(252, 92, 125, 0.5);
 }
 
-/* QR Code */
-.qr-container {
-  text-align: center;
-  margin: 25px 0;
-}
 
-.qr-container img {
-  border-radius: 15px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-  cursor: pointer;
-}
+
 
 /* Note */
 .note {
@@ -750,7 +746,7 @@
   }
 
   .donation-image img {
-    max-width: 300px;
+    max-width: 800px;
     margin: 0 auto 25px;
   }
 }
@@ -1384,8 +1380,8 @@ margin-top: -40px;
 }
 
 .qr-container-i img {
-  width: 200px;
-  height: 200px;
+  width: 100px;
+  height: 100px;
   display: inline-block; /* or keep as inline element */
 }
 
@@ -1803,3 +1799,5 @@ margin-top: -40px;
     font-size: 0.9rem;
   }
 }
+
+

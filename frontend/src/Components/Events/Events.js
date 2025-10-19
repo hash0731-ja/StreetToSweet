@@ -337,8 +337,9 @@ const generateGoogleCalendarLink = (event) => {
         </div>
       )}
 
-       <div className="past-events">
-  <h2>Past Events & Success Stories</h2>
+       <div className="past--events">
+  <h2>Past Events & Success Stories</h2><br></br>
+  <p>Celebrate the milestones we've achieved together through our past events and success stories. From heartwarming adoptions to life-saving rescues, every story reflects our community’s compassion and commitment to transforming the lives of street dogs.</p>
   <div className="past-carousel">
     {pastEvents.map((past, index) => (
       <div key={index} className="past-card">

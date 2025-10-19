@@ -252,32 +252,40 @@ const [selectedDog, setSelectedDog] = useState(null);
   </div>
 
   {/* ---------- MODAL FOR DOG DETAILS ---------- */}
-  {selectedDog && (
-    <div className="modal">
-      <div className="modal-backdrop" onClick={() => setSelectedDog(null)} />
-      <div className="modal-panel">
-        <button className="modal-close" onClick={() => setSelectedDog(null)}>✕</button>
-        <div className="modal-grid">
-          <div className="modal-image">
-            <img src={selectedDog.photo} alt={selectedDog.name} />
-          </div>
-          <div className="modal-info">
-            <h3>{selectedDog.name}</h3>
-            <p><span>Age: </span>{selectedDog.age}</p>
-            <p><span>Breed: </span>{selectedDog.breed}</p>
-            <p><span>Status: </span>{selectedDog.status === "adoption" ? "Available" : "Under Treatment"}</p>
-            <p><span>Vaccinated: </span>{selectedDog.vaccinated ? "Yes" : "No"}</p>
-            <p><span>Description: </span>{selectedDog.description}</p>
-            {selectedDog.status === "adoption" && (
-              <button className="btn dc-adopt-btn" onClick={() => handleAdopt(selectedDog)}>Adopt Me</button>
-            )}
+        {/* Dog Details Modal */}
+      {selectedDog && (
+        <div className="modal">
+          <div className="modal-panel">
+            <button className="modal-close" onClick={() => setSelectedDog(null)}>✕</button>
+            <div className="modal-grid">
+              <div className="modal-image">
+                <img src={selectedDog.photo} alt={selectedDog.name} />
+              </div>
+              <div className="modal-info">
+                <h3>{selectedDog.name}</h3>
+                <p><span>Age: </span>{selectedDog.age}</p>
+                <p><span>Breed: </span>{selectedDog.breed}</p>
+                <p><span>Status: </span>{selectedDog.status === "adoption" ? "Available" : "Under Treatment"}</p>
+                <p><span>Health Status: </span>{selectedDog.healthStatus}</p>
+                <p><span>Medical Notes: </span>{selectedDog.medicalNotes}</p>
+                <p><span>Recent Treatment: </span>{selectedDog.treatment}</p>
+                
+                {selectedDog.status === "adoption" && (
+                  <button 
+                    className="btn dc-adopt-btn" 
+                    onClick={() => {
+                      setSelectedDog(null);
+                      navigate("/adoptionrequest", { state: { dog: selectedDog } });
+                    }}
+                  >
+                    Adopt Me
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    
-  )}
+      )}
 
 </section>
 

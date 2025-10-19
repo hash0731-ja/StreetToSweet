@@ -17,7 +17,10 @@ const {
     createBlogPost,
     getVolunteerBlogPosts,
     updateBlogPost,
-    deleteBlogPost
+    deleteBlogPost,
+    deleteHealthReport,
+    deleteWalkLog
+
 } = require('../Controlers/VolunteerDashboardController');
 
 
@@ -101,5 +104,11 @@ router.post('/blog-posts', upload.single('featuredImage'), createBlogPost);
 router.get('/blog-posts', getVolunteerBlogPosts);
 router.put('/blog-posts/:postId', upload.single('featuredImage'), updateBlogPost);
 router.delete('/blog-posts/:postId', deleteBlogPost);
+
+// Delete health report
+router.delete('/health-reports/:reportId', deleteHealthReport);
+
+// Delete walk log
+router.delete('/walks/:walkId', deleteWalkLog);
 
 module.exports = router;
